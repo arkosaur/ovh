@@ -1105,15 +1105,15 @@ const ServersPage = () => {
     
     // 渲染分组选项
     return (
-      <div className="space-y-4 mt-2">
+      <div className="space-y-3 mt-3">
         {filteredDefaultOptions.length > 0 && (
           <div className="rounded-md overflow-hidden border border-cyber-accent/20">
-            <div className="px-3 py-2 bg-cyber-grid/20 border-b border-cyber-accent/20 flex items-center">
-              <ArrowRightLeft size={14} className="mr-2 text-cyber-accent" />
-              <span className="text-sm font-medium">默认配置</span>
+            <div className="px-2.5 py-1.5 bg-cyber-grid/20 border-b border-cyber-accent/20 flex items-center">
+              <ArrowRightLeft size={13} className="mr-1.5 text-cyber-accent" />
+              <span className="text-xs font-medium">默认配置</span>
             </div>
-            <div className="bg-cyber-grid/5 p-3">
-              <div className="flex flex-wrap gap-2">
+            <div className="bg-cyber-grid/5 p-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 {filteredDefaultOptions.map(option => {
                   // 确定此选项属于哪个组
                   let groupName = "其他";
@@ -1129,10 +1129,10 @@ const ServersPage = () => {
                   return (
                     <div
                       key={option.value}
-                      className="flex flex-col bg-cyber-accent/10 px-3 py-2 rounded text-xs border border-cyber-accent/20"
+                      className="flex flex-col bg-cyber-accent/10 px-2 py-1.5 rounded text-xs border border-cyber-accent/20 min-h-[2.5rem]"
                     >
-                      <span className="font-medium">{displayLabel}</span>
-                      <span className="text-cyber-muted font-mono text-[10px] mt-1">{detailLabel}</span>
+                      <span className="font-medium text-xs leading-tight">{displayLabel}</span>
+                      <span className="text-cyber-muted font-mono text-[9px] mt-0.5 leading-tight truncate">{detailLabel}</span>
                     </div>
                   );
                 })}
@@ -1144,9 +1144,9 @@ const ServersPage = () => {
         {/* 只有当可选配置和默认配置不一致时才显示可选配置区域 */}
         {!optionsIdentical && hasGroupedOptions && (
           <div className="rounded-md overflow-hidden border border-cyber-accent/20">
-            <div className="px-3 py-2 bg-cyber-grid/20 border-b border-cyber-accent/20 flex items-center">
-              <Settings size={14} className="mr-2 text-cyber-accent" />
-              <span className="text-sm font-medium">自定义配置</span>
+            <div className="px-2.5 py-1.5 bg-cyber-grid/20 border-b border-cyber-accent/20 flex items-center">
+              <Settings size={13} className="mr-1.5 text-cyber-accent" />
+              <span className="text-xs font-medium">自定义配置</span>
             </div>
             <div className="divide-y divide-cyber-accent/10">
               {Object.entries(optionGroups).map(([groupName, options]) => {
@@ -1161,12 +1161,12 @@ const ServersPage = () => {
                 else if (groupName === "vRack内网") GroupIcon = ArrowRightLeft;
                 
                 return (
-                  <div key={groupName} className="p-3">
-                    <div className="font-medium text-xs mb-2 flex items-center text-cyber-accent">
-                      <GroupIcon size={14} className="mr-1.5" />
+                  <div key={groupName} className="p-2">
+                    <div className="font-medium text-[11px] mb-1.5 flex items-center text-cyber-accent">
+                      <GroupIcon size={12} className="mr-1" />
                       {groupName}
                     </div>
-                    <div className="space-y-2 pl-1">
+                    <div className="space-y-1 pl-0.5">
                       {options.map(option => {
                         const { displayLabel, detailLabel } = formatOptionDisplay(option, groupName);
                         const isSelected = isOptionSelected(server.planCode, option.value);
@@ -1174,32 +1174,30 @@ const ServersPage = () => {
                         return (
                           <div key={option.value} className="flex items-center">
                             <label 
-                              className={`flex items-center justify-between p-2 rounded-md cursor-pointer transition-colors w-full
+                              className={`flex items-center justify-between px-2 py-1.5 rounded cursor-pointer transition-colors w-full
                                 ${isSelected 
                                   ? 'bg-cyber-accent/15 border border-cyber-accent/30' 
                                   : 'hover:bg-cyber-grid/10 border border-transparent'}`}
                             >
-                              <div className="flex items-center">
-                                <div className="relative mr-2 flex items-center justify-center w-5 h-5">
+                              <div className="flex items-center min-w-0">
+                                <div className="relative mr-1.5 flex items-center justify-center w-4 h-4 flex-shrink-0">
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
                                   onChange={() => toggleOption(server.planCode, option.value, groupName)}
                                     className="opacity-0 absolute w-full h-full cursor-pointer"
                                   />
-                                  <div className={`w-5 h-5 border rounded-sm flex items-center justify-center ${isSelected ? 'border-cyber-accent bg-cyber-accent/30' : 'border-slate-500'}`}>
+                                  <div className={`w-4 h-4 border rounded-sm flex items-center justify-center ${isSelected ? 'border-cyber-accent bg-cyber-accent/30' : 'border-slate-500'}`}>
                                     {isSelected && (
-                                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-accent">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-accent">
                                         <polyline points="20 6 9 17 4 12"></polyline>
                                       </svg>
                                     )}
                                   </div>
                                 </div>
-                                <div className="flex flex-col">
-                                  <div className="flex flex-col">
-                                    <span className="text-sm font-medium">{displayLabel}</span>
-                                    <span className="text-xs text-cyber-muted font-mono">{detailLabel}</span>
-                                  </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-xs font-medium truncate">{displayLabel}</span>
+                                  <span className="text-[10px] text-cyber-muted font-mono truncate">{detailLabel}</span>
                                 </div>
                               </div>
                             </label>
@@ -1217,12 +1215,12 @@ const ServersPage = () => {
         {/* 显示已选配置的摘要 */}
         {selectedOptions[server.planCode]?.length > 0 && 
          !selectedOptions[server.planCode].every(opt => server.defaultOptions.map(o => o.value).includes(opt)) && (
-          <div className="mt-2 p-2 bg-cyber-accent/10 border border-cyber-accent/30 rounded-md">
-            <div className="text-xs font-medium text-cyber-accent mb-1.5 flex items-center">
-              <CheckSquare size={14} className="mr-1.5" />
+          <div className="mt-2 p-1.5 bg-cyber-accent/10 border border-cyber-accent/30 rounded-md">
+            <div className="text-[10px] font-medium text-cyber-accent mb-1 flex items-center">
+              <CheckSquare size={12} className="mr-1" />
               已选自定义配置
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1">
               {selectedOptions[server.planCode].map(optValue => {
                 const option = server.availableOptions.find(o => o.value === optValue);
                 if (!option || server.defaultOptions.map(o => o.value).includes(optValue)) return null;
@@ -1238,7 +1236,7 @@ const ServersPage = () => {
                 const { displayLabel } = formatOptionDisplay(option, groupName);
                 
                 return (
-                  <div key={optValue} className="px-2 py-1 bg-cyber-accent/20 rounded text-xs flex items-center">
+                  <div key={optValue} className="px-1.5 py-0.5 bg-cyber-accent/20 rounded text-[10px] flex items-center">
                     {displayLabel}
                     <button 
                       onClick={(e) => {
@@ -1421,52 +1419,52 @@ const ServersPage = () => {
             >
               <Card className="border-cyber-accent/30 overflow-hidden h-full">
                 {/* Header with server code and name */}
-                <CardHeader className="px-4 py-3 bg-cyber-grid/20 border-b border-cyber-accent/20">
+                <CardHeader className="px-3 py-2 bg-cyber-grid/20 border-b border-cyber-accent/20">
                   <div className="flex justify-between items-center">
-                    <CardTitle className="text-lg">{server.planCode}</CardTitle>
-                    <div className="bg-cyber-accent/10 px-2 py-1 rounded text-xs border border-cyber-accent/20 text-cyber-accent">
+                    <CardTitle className="text-base font-semibold">{server.planCode}</CardTitle>
+                    <div className="bg-cyber-accent/10 px-1.5 py-0.5 rounded text-[10px] border border-cyber-accent/20 text-cyber-accent">
                       {server.name}
                     </div>
                   </div>
                 </CardHeader>
                 
-                <CardContent className="p-4">
+                <CardContent className="p-3">
                   {/* Server specs in a grid */}
-                  <div className="grid grid-cols-2 gap-2 mb-4">
-                    <div className="flex items-center space-x-2 p-2 bg-cyber-grid/10 rounded border border-cyber-accent/10">
-                      <Cpu size={18} className="text-cyber-accent" />
-                      <div>
-                        <div className="text-xs text-cyber-muted">CPU</div>
-                        <div className="font-medium text-sm">{formatServerSpec(server.cpu, "CPU")}</div>
+                  <div className="grid grid-cols-2 gap-1.5 mb-3">
+                    <div className="flex items-center space-x-1.5 p-1.5 bg-cyber-grid/10 rounded border border-cyber-accent/10">
+                      <Cpu size={14} className="text-cyber-accent flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-[10px] text-cyber-muted">CPU</div>
+                        <div className="font-medium text-xs truncate">{formatServerSpec(server.cpu, "CPU")}</div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2 p-2 bg-cyber-grid/10 rounded border border-cyber-accent/10">
-                      <Database size={18} className="text-cyber-accent" />
-                      <div>
-                        <div className="text-xs text-cyber-muted">内存</div>
-                        <div className="font-medium text-sm">{formatServerSpec(server.memory, "内存")}</div>
+                    <div className="flex items-center space-x-1.5 p-1.5 bg-cyber-grid/10 rounded border border-cyber-accent/10">
+                      <Database size={14} className="text-cyber-accent flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-[10px] text-cyber-muted">内存</div>
+                        <div className="font-medium text-xs truncate">{formatServerSpec(server.memory, "内存")}</div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2 p-2 bg-cyber-grid/10 rounded border border-cyber-accent/10">
-                      <HardDrive size={18} className="text-cyber-accent" />
-                      <div>
-                        <div className="text-xs text-cyber-muted">存储</div>
-                        <div className="font-medium text-sm">{formatServerSpec(server.storage, "存储")}</div>
+                    <div className="flex items-center space-x-1.5 p-1.5 bg-cyber-grid/10 rounded border border-cyber-accent/10">
+                      <HardDrive size={14} className="text-cyber-accent flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-[10px] text-cyber-muted">存储</div>
+                        <div className="font-medium text-xs truncate">{formatServerSpec(server.storage, "存储")}</div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2 p-2 bg-cyber-grid/10 rounded border border-cyber-accent/10">
-                      <Wifi size={18} className="text-cyber-accent" />
-                      <div>
-                        <div className="text-xs text-cyber-muted">带宽</div>
-                        <div className="font-medium text-sm">{formatServerSpec(server.bandwidth, "带宽")}</div>
+                    <div className="flex items-center space-x-1.5 p-1.5 bg-cyber-grid/10 rounded border border-cyber-accent/10">
+                      <Wifi size={14} className="text-cyber-accent flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-[10px] text-cyber-muted">带宽</div>
+                        <div className="font-medium text-xs truncate">{formatServerSpec(server.bandwidth, "带宽")}</div>
                       </div>
                     </div>
                     {server.vrackBandwidth && server.vrackBandwidth !== "N/A" && (
-                      <div className="flex items-center space-x-2 p-2 bg-cyber-grid/10 rounded border border-cyber-accent/10 col-span-2">
-                        <ArrowRightLeft size={18} className="text-cyber-accent" />
-                        <div>
-                          <div className="text-xs text-cyber-muted">内网带宽</div>
-                          <div className="font-medium text-sm">{formatServerSpec(server.vrackBandwidth, "内网带宽")}</div>
+                      <div className="flex items-center space-x-1.5 p-1.5 bg-cyber-grid/10 rounded border border-cyber-accent/10 col-span-2">
+                        <ArrowRightLeft size={14} className="text-cyber-accent flex-shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-[10px] text-cyber-muted">内网带宽</div>
+                          <div className="font-medium text-xs truncate">{formatServerSpec(server.vrackBandwidth, "内网带宽")}</div>
                         </div>
                       </div>
                     )}
@@ -1476,9 +1474,9 @@ const ServersPage = () => {
                   {renderServerOptions(server)}
                   
                   {/* Datacenters availability section - REINSTATED */}
-                  <div className="mt-6 rounded-md overflow-hidden border border-cyber-accent/30">
-                    <div className="flex justify-between items-center bg-cyber-grid/30 px-4 py-3 border-b border-cyber-accent/30">
-                      <span className="text-sm font-medium flex items-center">
+                  <div className="mt-4 rounded-md overflow-hidden border border-cyber-accent/30">
+                    <div className="flex justify-between items-center bg-cyber-grid/30 px-3 py-2 border-b border-cyber-accent/30">
+                      <span className="text-xs font-medium flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-accent mr-2">
                           <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
                           <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
@@ -1487,24 +1485,24 @@ const ServersPage = () => {
                         </svg>
                         数据中心选择
                       </span>
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-1.5">
                         <Button
                           onClick={() => checkAvailability(server.planCode)}
                           disabled={isCheckingAvailability || !isAuthenticated}
                           variant="cyber"
                           size="sm"
-                          className="h-8 text-xs"
+                          className="h-6 text-[10px] px-2"
                         >
                           {isCheckingAvailability && selectedServer === server.planCode ? (
                             <span className="inline-flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5 h-4 w-4 animate-pulse text-cyber-accent">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 animate-pulse text-cyber-accent">
                                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                               </svg>
-                              ({server.planCode})
+                              查询中
                             </span>
                           ) : (
                             <span className="inline-flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
                                 <circle cx="12" cy="12" r="10"></circle>
                                 <line x1="12" y1="16" x2="12" y2="12"></line>
                                 <line x1="12" y1="8" x2="12.01" y2="8"></line>
@@ -1525,28 +1523,28 @@ const ServersPage = () => {
                           disabled={!isAuthenticated || getSelectedDatacentersList(server.planCode).length === 0}
                           variant="cyber-filled"
                           size="sm"
-                          className="h-8 text-xs"
+                          className="h-6 text-[10px] px-2"
                         >
                           抢购
                         </Button>
                       </div>
                     </div>
                     
-                    <div className="p-3 bg-cyber-grid/10 border-b border-cyber-accent/20">
+                    <div className="p-2 bg-cyber-grid/10 border-b border-cyber-accent/20">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-cyber-muted flex items-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                        <span className="text-[10px] text-cyber-muted flex items-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
                             <circle cx="12" cy="12" r="10"></circle>
                             <path d="M12 8v4l3 3"></path>
                           </svg>
                           选择部署位置:
                         </span>
-                        <div className="flex space-x-2">
+                        <div className="flex space-x-1">
                           <Button
                             onClick={() => toggleAllDatacenters(server.planCode, true)}
                             variant="cyber"
                             size="sm"
-                            className="h-7 text-xs bg-cyber-accent/10 hover:bg-cyber-accent/20"
+                            className="h-5 text-[9px] px-1.5 bg-cyber-accent/10 hover:bg-cyber-accent/20"
                           >
                             全选
                           </Button>
@@ -1554,7 +1552,7 @@ const ServersPage = () => {
                             onClick={() => toggleAllDatacenters(server.planCode, false)}
                             variant="cyber"
                             size="sm"
-                            className="h-7 text-xs"
+                            className="h-5 text-[9px] px-1.5"
                           >
                             取消全选
                           </Button>
@@ -1563,8 +1561,8 @@ const ServersPage = () => {
                     </div>
                     
                     {/* 数据中心列表 - 采用用户截图样式，一行1-2列 */}
-                    <div className="bg-slate-900/10 p-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="bg-slate-900/10 p-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {OVH_DATACENTERS
                           .filter(dc => {
                             // 如果服务器代码包含特定数据中心后缀，只显示对应的数据中心
@@ -1604,7 +1602,7 @@ const ServersPage = () => {
                               return (
                                 <div 
                                   key={dcCode}
-                              className={`relative flex items-center justify-between p-2.5 rounded-md cursor-pointer transition-all duration-150 ease-in-out 
+                              className={`relative flex items-center justify-between p-1.5 rounded cursor-pointer transition-all duration-150 ease-in-out 
                                           border 
                                     ${isSelected 
                                             ? 'bg-cyber-accent/20 border-cyber-accent shadow-md'
@@ -1613,17 +1611,16 @@ const ServersPage = () => {
                                   onClick={() => toggleDatacenterSelection(server.planCode, dcCode)}
                               title={`${dc.name} (${dc.region}) - ${statusText}`}
                             >
-                              <div className="flex items-center overflow-hidden mr-2"> {/* Restored overflow-hidden */}
-                                {/* Use CSS class for flag icon based on countryCode */}
-                                <span className={`fi fi-${dc.countryCode.toLowerCase()} mr-2 text-lg`}></span> {/* Adjusted size via text-lg, ensure flag icon CSS handles sizing */}
-                                <div className="flex flex-col overflow-hidden"> {/* Restored overflow-hidden */}
-                                  <span className={`text-base font-semibold ${isSelected ? 'text-cyber-accent' : 'text-slate-100'} truncate`}>{dcCode}</span> {/* Restored truncate */}
-                                  <span className={`text-[11px] ${isSelected ? 'text-slate-300' : 'text-slate-400'} mt-0.5 truncate`}>{dc.name}</span> {/* Restored truncate */}
+                              <div className="flex items-center overflow-hidden mr-1.5 min-w-0">
+                                <span className={`fi fi-${dc.countryCode.toLowerCase()} mr-1.5 text-sm flex-shrink-0`}></span>
+                                <div className="flex flex-col overflow-hidden min-w-0">
+                                  <span className={`text-xs font-semibold ${isSelected ? 'text-cyber-accent' : 'text-slate-100'} truncate`}>{dcCode}</span>
+                                  <span className={`text-[9px] ${isSelected ? 'text-slate-300' : 'text-slate-400'} mt-0.5 truncate`}>{dc.name}</span>
                                 </div>
                               </div>
-                              <span className={`text-xs font-medium ${statusColorClass} flex items-center flex-shrink-0`}>
+                              <span className={`text-[10px] font-medium ${statusColorClass} flex items-center flex-shrink-0`}>
                                 {availStatus === "unknown" ? (
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 animate-pulse">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-pulse">
                                     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                                   </svg>
                                 ) : (
@@ -1632,8 +1629,8 @@ const ServersPage = () => {
                               </span>
                                   
                                   {isSelected && (
-                                <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-cyber-accent rounded-full flex items-center justify-center">
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <div className="absolute top-1 right-1 w-4 h-4 bg-cyber-accent rounded-full flex items-center justify-center">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                         <polyline points="20 6 9 17 4 12"></polyline>
                                       </svg>
                                     </div>
