@@ -207,14 +207,10 @@ const QueuePage = () => {
 
   return (
     <div className="space-y-6 p-4 md:p-6 bg-cyber-background text-cyber-text min-h-screen">
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
+      <div>
         <h1 className="text-3xl font-bold mb-1 cyber-glow-text">抢购队列</h1>
         <p className="text-cyber-muted mb-6">管理自动抢购服务器的队列</p>
-      </motion.div>
+      </div>
 
       {/* Controls */}
       <div className="flex justify-between items-center mb-6">
@@ -237,13 +233,7 @@ const QueuePage = () => {
 
       {/* Add Form */}
       {showAddForm && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          exit={{ opacity: 0, height: 0 }}
-          transition={{ duration: 0.3 }}
-          className="bg-cyber-surface-dark p-6 rounded-lg shadow-xl border border-cyber-border relative"
-        >
+        <div className="bg-cyber-surface-dark p-6 rounded-lg shadow-xl border border-cyber-border relative">
           <button 
             onClick={() => setShowAddForm(false)} 
             className="absolute top-3 right-3 text-cyber-muted hover:text-cyber-text transition-colors"
@@ -329,11 +319,11 @@ const QueuePage = () => {
           >
             添加到队列
           </button>
-        </motion.div>
+        </div>
       )}
 
       {/* Queue List */}
-      <motion.div variants={containerVariants} initial="hidden" animate="visible">
+      <div>
         {queueItems.length === 0 && (
           <div className="text-center py-10 border border-dashed border-cyber-border rounded-lg">
             <SearchIcon className="mx-auto text-cyber-secondary mb-2" size={32} />
@@ -345,9 +335,8 @@ const QueuePage = () => {
         {queueItems.length > 0 && (
           <div className="space-y-3">
             {queueItems.map(item => (
-              <motion.div 
-                key={item.id} 
-                variants={itemVariants}
+              <div 
+                key={item.id}
                 className="bg-cyber-surface p-4 rounded-lg shadow-md border border-cyber-border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
               >
                 <div className="flex-grow">
@@ -390,11 +379,11 @@ const QueuePage = () => {
                     <Trash2Icon size={16} />
                   </button>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         )}
-      </motion.div>
+      </div>
     </div>
   );
 };
