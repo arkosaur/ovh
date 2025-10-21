@@ -16,6 +16,16 @@ interface StatsType {
   purchaseFailed: number;
 }
 
+interface QueueItem {
+  id: string;
+  planCode: string;
+  datacenter: string;
+  status: string;
+  retryCount: number;
+  retryInterval: number;
+  createdAt: string;
+}
+
 const Dashboard = () => {
   const { isAuthenticated } = useAPI();
   const [stats, setStats] = useState<StatsType>({
@@ -25,24 +35,33 @@ const Dashboard = () => {
     purchaseSuccess: 0,
     purchaseFailed: 0,
   });
+  const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchData = async () => {
       try {
-        const response = await axios.get(`${API_URL}/stats`);
-        setStats(response.data);
+        const [statsResponse, queueResponse] = await Promise.all([
+          axios.get(`${API_URL}/stats`),
+          axios.get(`${API_URL}/queue`)
+        ]);
+        setStats(statsResponse.data);
+        // 只显示活跃的队列项（running, pending, paused），最多3个
+        const activeItems = queueResponse.data
+          .filter((item: QueueItem) => ['running', 'pending', 'paused'].includes(item.status))
+          .slice(0, 3);
+        setQueueItems(activeItems);
       } catch (error) {
-        console.error("Error fetching stats:", error);
+        console.error("Error fetching data:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchStats();
+    fetchData();
     
     // Set up polling interval
-    const interval = setInterval(fetchStats, 30000);
+    const interval = setInterval(fetchData, 30000);
     
     return () => clearInterval(interval);
   }, []);
@@ -250,32 +269,33 @@ const Dashboard = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              {/* 这里可以显示队列详情，但因为我们没有实际数据，所以先用占位符 */}
-              <div className="cyber-panel p-3 bg-cyber-grid/30 flex justify-between items-center">
-                <div className="flex-1">
-                  <p className="font-medium">25skmystery01</p>
-                  <div className="flex items-center gap-2 text-xs text-cyber-muted mt-1">
-                    <span>RBX</span>
-                    <span>•</span>
-                    <span>内存: 32GB</span>
-                    <span>•</span>
-                    <span>硬盘: 2TB</span>
+              {queueItems.map((item) => (
+                <div key={item.id} className="cyber-panel p-3 bg-cyber-grid/30 flex justify-between items-center">
+                  <div className="flex-1">
+                    <p className="font-medium">{item.planCode}</p>
+                    <div className="flex items-center gap-2 text-xs text-cyber-muted mt-1">
+                      <span>DC: {item.datacenter.toUpperCase()}</span>
+                      <span>•</span>
+                      <span>第{item.retryCount + 1}次尝试</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-1 rounded-full flex items-center ${
+                      item.status === 'running' ? 'bg-green-500/20 text-green-400' :
+                      item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                      'bg-gray-500/20 text-gray-400'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 mr-1 rounded-full ${
+                        item.status === 'running' ? 'bg-green-400 animate-pulse' :
+                        item.status === 'pending' ? 'bg-yellow-400' :
+                        'bg-gray-400'
+                      }`}></span>
+                      {item.status === 'running' ? '运行中' :
+                       item.status === 'pending' ? '待命中' : '暂停'}
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="animate-pulse text-green-400 text-xs flex items-center">
-                    <span className="w-1.5 h-1.5 mr-1 rounded-full bg-green-400"></span>
-                    运行中
-                  </span>
-                  <button className="p-1 hover:text-cyber-accent transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                      <line x1="9" y1="9" x2="15" y2="15"></line>
-                      <line x1="15" y1="9" x2="9" y2="15"></line>
-                    </svg>
-                  </button>
-                </div>
-              </div>
+              ))}
             </div>
           )}
         </motion.div>

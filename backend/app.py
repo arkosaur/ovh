@@ -197,7 +197,8 @@ def add_log(level, message, source="system"):
 # Update statistics
 def update_stats():
     global stats
-    active_count = sum(1 for item in queue if item["status"] == "running")
+    # 活跃队列 = 所有未完成的队列项（running + pending），不包括已完成或失败的
+    active_count = sum(1 for item in queue if item["status"] in ["running", "pending", "paused"])
     available_count = 0
     
     # Count available servers
