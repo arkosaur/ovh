@@ -161,7 +161,7 @@ const ServersPage = () => {
   };
 
   // Fetch servers from the backend
-  const fetchServers = async (forceRefresh = false) => {
+  const fetchServers = async (forceRefresh = false, overrideAuth?: boolean) => {
     // 如果不是强制刷新，并且已从缓存加载过数据，并且缓存未过期，则跳过
     if (!forceRefresh && hasLoadedFromCache.current && !isCacheExpired()) {
       console.log("使用现有数据，缓存未过期，跳过API请求");
@@ -174,13 +174,25 @@ const ServersPage = () => {
       return;
     }
     
+    // 使用传入的认证状态或当前状态
+    const authState = overrideAuth !== undefined ? overrideAuth : isAuthenticated;
+    console.log(`📊 认证状态检查 - overrideAuth: ${overrideAuth}, isAuthenticated: ${isAuthenticated}, 最终使用: ${authState}`);
+    
     setIsLoading(true);
     setIsActuallyFetching(true); // 标记开始从API获取
     try {
-      console.log(`开始从API获取服务器数据... (forceRefresh: ${forceRefresh})`);
+      console.log(`开始从API获取服务器数据... (forceRefresh: ${forceRefresh}, showApiServers: ${authState})`);
+      
+      // 首次加载提示用户需要等待
+      if (forceRefresh && !hasLoadedFromCache.current) {
+        toast.info('正在从OVH获取服务器列表，首次加载可能需要1-2分钟，请耐心等待...', {
+          duration: 5000
+        });
+      }
+      
       const response = await api.get(`/servers`, {
         params: { 
-          showApiServers: isAuthenticated,
+          showApiServers: authState,
           forceRefresh: forceRefresh 
         }
       });
@@ -289,7 +301,9 @@ const ServersPage = () => {
       
       // 更详细的错误提示
       let errorMessage = "获取服务器列表失败";
-      if (error.response?.status === 401) {
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = '请求超时，OVH服务器响应较慢，请点击"刷新"按钮重试';
+      } else if (error.response?.status === 401) {
         errorMessage = "认证失败，请检查API配置";
       } else if (error.response?.status === 403) {
         errorMessage = "API密钥无效或权限不足";
@@ -299,7 +313,9 @@ const ServersPage = () => {
         errorMessage = `获取服务器列表失败: ${error.message}`;
       }
       
-      toast.error(errorMessage);
+      toast.error(errorMessage, {
+        duration: 6000
+      });
       setIsLoading(false); // 确保isLoading在出错时也更新
       
       // 如果API请求失败但有缓存数据，尝试从缓存加载
@@ -605,6 +621,10 @@ const ServersPage = () => {
     
     setIsCheckingAvailability(true);
     setSelectedServer(planCode);
+    
+    // 提示用户正在检测
+    toast.info(`正在检测 ${planCode} 的可用性...`, { duration: 2000 });
+    
     try {
       // 获取用户选择的配置选项
       const selectedOpts = selectedOptions[planCode] || [];
@@ -617,7 +637,10 @@ const ServersPage = () => {
         params.options = selectedOpts.join(',');
       }
       
-      const response = await api.get(`/availability/${planCode}`, { params });
+      const response = await api.get(`/availability/${planCode}`, { 
+        params,
+        timeout: 120000 // 2分钟超时
+      });
       console.log(`获取到 ${planCode} 的可用性数据 (配置: ${selectedOpts.join(', ') || '默认'}):`, response.data);
       
       // OVH API返回的数据中心代码可能与前端不一致，需要映射
@@ -638,9 +661,19 @@ const ServersPage = () => {
       }));
       
       toast.success(`已更新 ${planCode} 可用性信息`);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error checking availability for ${planCode}:`, error);
-      toast.error(`获取 ${planCode} 可用性失败`);
+      
+      let errorMessage = `获取 ${planCode} 可用性失败`;
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = `${planCode} 可用性检测超时，OVH响应较慢，请稍后重试`;
+      } else if (error.response?.status === 404) {
+        errorMessage = `${planCode} 不存在或已下架`;
+      } else if (error.message) {
+        errorMessage = `获取 ${planCode} 可用性失败: ${error.message}`;
+      }
+      
+      toast.error(errorMessage, { duration: 5000 });
     } finally {
       setIsCheckingAvailability(false);
       setSelectedServer(null);
@@ -865,11 +898,9 @@ const ServersPage = () => {
     // Subscribe to auth change events
     const unsubscribe = apiEvents.onAuthChanged((newAuthState) => {
       console.log("认证状态改变事件触发，新状态:", newAuthState);
-      console.log("强制刷新服务器列表...");
-      // 使用setTimeout确保状态已更新
-      setTimeout(() => {
-        fetchServers(true); // 认证状态改变时强制刷新
-      }, 100);
+      console.log("强制刷新服务器列表，使用事件传来的认证状态...");
+      // 使用事件传来的状态，而不是等待组件状态更新
+      fetchServers(true, newAuthState); // 传入认证状态，避免使用过期的组件状态
     });
     
     return () => {

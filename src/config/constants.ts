@@ -95,8 +95,9 @@ export const API_RETRY_COUNT = 1;
 
 /**
  * API请求超时时间（毫秒）
+ * 服务器列表获取可能需要较长时间（OVH API调用）
  */
-export const API_TIMEOUT = 30000; // 30秒
+export const API_TIMEOUT = 120000; // 120秒（2分钟）
 
 // ==================== 辅助函数 ====================
 
