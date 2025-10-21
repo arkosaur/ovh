@@ -110,9 +110,37 @@ fetchServers(true); // forceRefresh = true
    - 后端：内存缓存（重启后失效）
    - 前端：LocalStorage（持久化）
 
+## 文件夹结构优化
+
+为了更好地管理缓存和数据文件，已将所有文件整理到专门的目录中：
+
+```
+backend/
+├── data/              # 数据文件目录
+│   ├── config.json    # API配置
+│   ├── logs.json      # 操作日志
+│   ├── queue.json     # 抢购队列
+│   ├── history.json   # 购买历史
+│   └── servers.json   # 服务器列表缓存
+├── cache/             # API调试缓存
+│   ├── ovh_catalog_raw.json
+│   └── servers/       # 各服务器详细数据
+├── logs/              # 应用日志
+│   └── app.log
+├── app.py
+└── requirements.txt
+```
+
+**迁移旧文件：**
+```bash
+cd backend
+python migrate_files.py
+```
+
 ## 未来优化建议
 
-1. 后端缓存持久化到文件或Redis
+1. 后端缓存持久化到Redis（跨重启保留）
 2. 添加缓存过期通知机制
 3. 支持按数据中心缓存可用性信息
-4. 添加缓存管理API端点
+4. 添加缓存管理API端点（清除、刷新）
+5. 添加数据文件自动备份功能

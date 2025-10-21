@@ -12,12 +12,22 @@ import re
 import traceback
 import requests
 
+# Data storage directories
+DATA_DIR = "data"
+CACHE_DIR = "cache"
+LOGS_DIR = "logs"
+
+# Ensure directories exist
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(CACHE_DIR, exist_ok=True)
+os.makedirs(LOGS_DIR, exist_ok=True)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("app.log"),
+        logging.FileHandler(os.path.join(LOGS_DIR, "app.log")),
         logging.StreamHandler()
     ]
 )
@@ -25,12 +35,12 @@ logging.basicConfig(
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-# Data storage (in-memory for this example, should be persisted in production)
-CONFIG_FILE = "config.json"
-LOGS_FILE = "logs.json"
-QUEUE_FILE = "queue.json"
-HISTORY_FILE = "history.json"
-SERVERS_FILE = "servers.json"
+# Data storage files (organized in data directory)
+CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
+LOGS_FILE = os.path.join(DATA_DIR, "logs.json")
+QUEUE_FILE = os.path.join(DATA_DIR, "queue.json")
+HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
+SERVERS_FILE = os.path.join(DATA_DIR, "servers.json")
 
 config = {
     "appKey": "",
@@ -611,13 +621,9 @@ def load_server_list():
     try:
         # 保存完整的API原始响应
         try:
-            # 创建一个目录来存储API数据
-            if not os.path.exists("api_data"):
-                os.makedirs("api_data")
-                
             # 尝试获取并保存原始目录响应
             catalog = client.get(f'/order/catalog/public/eco?ovhSubsidiary={config["zone"]}')
-            with open(os.path.join("api_data", "ovh_catalog_raw.json"), "w") as f:
+            with open(os.path.join(CACHE_DIR, "ovh_catalog_raw.json"), "w") as f:
                 json.dump(catalog, f, indent=2)
             add_log("INFO", "已保存完整的API原始响应")
         except Exception as e:
@@ -724,9 +730,8 @@ def load_server_list():
             # 保存服务器详细数据，以便于调试
             try:
                 # 创建一个目录来存储服务器数据
-                server_data_dir = os.path.join("api_data", plan_code)
-                if not os.path.exists(server_data_dir):
-                    os.makedirs(server_data_dir)
+                server_data_dir = os.path.join(CACHE_DIR, "servers", plan_code)
+                os.makedirs(server_data_dir, exist_ok=True)
                 
                 # 保存详细的plan数据
                 with open(os.path.join(server_data_dir, "plan_data.json"), "w") as f:
