@@ -55,6 +55,13 @@ stats = {
     "purchaseFailed": 0
 }
 
+# 服务器列表缓存
+server_list_cache = {
+    "data": [],
+    "timestamp": None,
+    "cache_duration": 2 * 60 * 60  # 缓存2小时
+}
+
 # Load data from files if they exist
 def load_data():
     global config, logs, queue, purchase_history, server_plans, stats
@@ -1767,18 +1774,32 @@ def clear_purchase_history():
 
 @app.route('/api/servers', methods=['GET'])
 def get_servers():
+    global server_plans, server_list_cache
     show_api_servers = request.args.get('showApiServers', 'false').lower() == 'true'
+    force_refresh = request.args.get('forceRefresh', 'false').lower() == 'true'
     
-    if show_api_servers and get_ovh_client():
-        # Try to reload from API
+    # 检查缓存是否有效
+    cache_valid = False
+    if server_list_cache["timestamp"] is not None:
+        cache_age = time.time() - server_list_cache["timestamp"]
+        cache_valid = cache_age < server_list_cache["cache_duration"]
+    
+    # 如果缓存有效且不是强制刷新，使用缓存
+    if cache_valid and not force_refresh:
+        add_log("INFO", f"使用缓存的服务器列表 (缓存时间: {int((time.time() - server_list_cache['timestamp']) / 60)} 分钟前)")
+        server_plans = server_list_cache["data"]
+    elif show_api_servers and get_ovh_client():
+        # 缓存失效或强制刷新，从API重新加载
         add_log("INFO", "正在从OVH API重新加载服务器列表...")
         api_servers = load_server_list()
         if api_servers:
-            global server_plans
             server_plans = api_servers
+            # 更新缓存
+            server_list_cache["data"] = api_servers
+            server_list_cache["timestamp"] = time.time()
             save_data()
             update_stats()
-            add_log("INFO", f"从OVH API加载了 {len(server_plans)} 台服务器")
+            add_log("INFO", f"从OVH API加载了 {len(server_plans)} 台服务器，已更新缓存")
             
             # 记录硬件信息统计
             cpu_count = sum(1 for s in server_plans if s["cpu"] != "N/A")
@@ -1788,13 +1809,12 @@ def get_servers():
             
             add_log("INFO", f"服务器硬件信息统计: CPU={cpu_count}/{len(server_plans)}, 内存={memory_count}/{len(server_plans)}, "
                    f"存储={storage_count}/{len(server_plans)}, 带宽={bandwidth_count}/{len(server_plans)}")
-            
-            # 记录几个示例服务器的详细信息，帮助排查
-            if len(server_plans) > 0:
-                sample_server = server_plans[0]
-                add_log("INFO", f"示例服务器信息: {json.dumps(sample_server, indent=2)}")
         else:
             add_log("WARNING", "从OVH API加载服务器列表失败")
+    elif not cache_valid and server_list_cache["data"]:
+        # 缓存过期但未认证，使用过期缓存
+        add_log("INFO", "缓存已过期但未配置API，使用过期缓存数据")
+        server_plans = server_list_cache["data"]
     
     # 确保返回的服务器对象具有所有必要字段
     validated_servers = []
@@ -1827,8 +1847,17 @@ def get_servers():
         
         validated_servers.append(validated_server)
     
-    # 返回服务器列表数组，前端将直接处理这个数组
-    return jsonify(validated_servers)
+    # 返回服务器列表和缓存信息
+    response_data = {
+        "servers": validated_servers,
+        "cacheInfo": {
+            "cached": cache_valid,
+            "timestamp": server_list_cache["timestamp"],
+            "cacheAge": int(time.time() - server_list_cache["timestamp"]) if server_list_cache["timestamp"] else None,
+            "cacheDuration": server_list_cache["cache_duration"]
+        }
+    }
+    return jsonify(response_data)
 
 @app.route('/api/availability/<plan_code>', methods=['GET'])
 def get_availability(plan_code):

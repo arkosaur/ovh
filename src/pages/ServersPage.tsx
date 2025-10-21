@@ -21,12 +21,9 @@ import { OVH_DATACENTERS, DatacenterInfo } from "@/config/ovhConstants"; // Impo
 // Backend API URL (update this to match your backend)
 const API_URL = 'http://localhost:5000/api';
 
-// 定义刷新间隔（30分钟）
-const REFRESH_INTERVAL = 30 * 60 * 1000;
-
 // 定义缓存相关的常量
 const CACHE_KEY = 'ovh-servers-cache';
-const CACHE_EXPIRY = 30 * 60 * 1000; // 缓存30分钟过期
+const CACHE_EXPIRY = 2 * 60 * 60 * 1000; // 缓存2小时过期（与后端保持一致）
 
 // 全局CSS样式
 const globalStyles = `
@@ -91,8 +88,6 @@ const ServersPage = () => {
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string[]>>({});
   // 上次更新时间
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  // 定时器引用
-  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   // 标记是否已从缓存加载
   const hasLoadedFromCache = useRef(false);
   // 新增：标记是否真正在从API获取数据，防止并发
@@ -179,7 +174,10 @@ const ServersPage = () => {
     try {
       console.log(`开始从API获取服务器数据... (forceRefresh: ${forceRefresh})`);
       const response = await axios.get(`${API_URL}/servers`, {
-        params: { showApiServers: isAuthenticated }
+        params: { 
+          showApiServers: isAuthenticated,
+          forceRefresh: forceRefresh 
+        }
       });
       
       // 调试输出查看原始服务器数据
@@ -808,23 +806,16 @@ const ServersPage = () => {
     
     loadInitialData();
     
-    // 设置定时刷新
-    refreshTimerRef.current = setInterval(() => {
-      console.log("定时刷新服务器数据...");
-      fetchServers(true); // 强制刷新
-    }, REFRESH_INTERVAL);
+    // 移除自动定时刷新，改为用户手动刷新
+    // 后端缓存2小时，避免频繁API调用
     
     // Subscribe to auth change events
     const unsubscribe = apiEvents.onAuthChanged(() => {
-      console.log("认证状态改变事件触发，尝试获取服务器 (将尊重缓存和isActuallyFetching状态)");
-      fetchServers(); // 修改为 fetchServers()，不再强制刷新，让函数内部逻辑判断
+      console.log("认证状态改变事件触发，强制刷新服务器列表");
+      fetchServers(true); // 认证状态改变时强制刷新
     });
     
     return () => {
-      // 清理定时器
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current);
-      }
       unsubscribe();
     };
   }, []);

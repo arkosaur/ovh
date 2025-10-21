@@ -38132,3 +38132,33 @@
 2025-06-11 23:56:52,752 - INFO - 160.191.40.205 - - [11/Jun/2025 23:56:52] "GET /api/availability/24sk40 HTTP/1.1" 200 -
 2025-06-11 23:57:11,877 - INFO - [system] 成功检查 24sk50-syd 的可用性: {'syd': '1H-high'}
 2025-06-11 23:57:11,882 - INFO - 160.191.40.205 - - [11/Jun/2025 23:57:11] "GET /api/availability/24sk50-syd HTTP/1.1" 200 -
+2025-10-21 19:21:23,030 - INFO - Data loaded from files
+2025-10-21 19:21:23,038 - INFO - [system] Server started
+2025-10-21 19:21:23,136 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.1.2:5000
+2025-10-21 19:21:23,136 - INFO - [33mPress CTRL+C to quit[0m
+2025-10-21 19:21:23,137 - INFO -  * Restarting with stat
+2025-10-21 19:21:23,435 - INFO - Data loaded from files
+2025-10-21 19:21:23,443 - INFO - [system] Server started
+2025-10-21 19:21:23,453 - WARNING -  * Debugger is active!
+2025-10-21 19:21:23,455 - INFO -  * Debugger PIN: 481-807-510
+2025-10-21 19:23:24,118 - INFO -  * Detected change in 'C:\\Users\\video\\Desktop\\OVH\\backend\\app.py', reloading
+2025-10-21 19:23:24,180 - INFO -  * Restarting with stat
+2025-10-21 19:23:24,455 - INFO - Data loaded from files
+2025-10-21 19:23:24,464 - INFO - [system] Server started
+2025-10-21 19:23:24,474 - WARNING -  * Debugger is active!
+2025-10-21 19:23:24,476 - INFO -  * Debugger PIN: 481-807-510
+2025-10-21 19:23:46,583 - INFO -  * Detected change in 'C:\\Users\\video\\Desktop\\OVH\\backend\\app.py', reloading
+2025-10-21 19:23:46,645 - INFO -  * Restarting with stat
+2025-10-21 19:23:46,910 - INFO - Data loaded from files
+2025-10-21 19:23:46,918 - INFO - [system] Server started
+2025-10-21 19:23:46,928 - WARNING -  * Debugger is active!
+2025-10-21 19:23:46,930 - INFO -  * Debugger PIN: 481-807-510
+2025-10-21 19:23:56,988 - INFO -  * Detected change in 'C:\\Users\\video\\Desktop\\OVH\\backend\\app.py', reloading
+2025-10-21 19:23:57,051 - INFO -  * Restarting with stat
+2025-10-21 19:23:57,316 - INFO - Data loaded from files
+2025-10-21 19:23:57,324 - INFO - [system] Server started
+2025-10-21 19:23:57,335 - WARNING -  * Debugger is active!
+2025-10-21 19:23:57,337 - INFO -  * Debugger PIN: 481-807-510
