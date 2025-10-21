@@ -334,14 +334,7 @@ const QueuePage = () => {
 
       {/* Queue List */}
       <motion.div variants={containerVariants} initial="hidden" animate="visible">
-        {isLoading && queueItems.length === 0 && (
-          <div className="text-center py-10">
-            <RefreshCwIcon className="mx-auto animate-spin text-cyber-primary mb-2" size={24} />
-            <p className="text-cyber-secondary">正在加载队列...</p>
-          </div>
-        )}
-
-        {!isLoading && queueItems.length === 0 && (
+        {queueItems.length === 0 && (
           <div className="text-center py-10 border border-dashed border-cyber-border rounded-lg">
             <SearchIcon className="mx-auto text-cyber-secondary mb-2" size={32} />
             <p className="text-cyber-secondary font-medium">队列为空</p>
