@@ -54,7 +54,7 @@ const QueuePage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(true);
   const [servers, setServers] = useState<ServerPlan[]>([]);
-  const [planCodeInput, setPlanCodeInput] = useState<string>("123");
+  const [planCodeInput, setPlanCodeInput] = useState<string>("");
   const [selectedServer, setSelectedServer] = useState<ServerPlan | null>(null);
   const [selectedDatacenters, setSelectedDatacenters] = useState<string[]>([]);
   const [retryInterval, setRetryInterval] = useState<number>(TASK_RETRY_INTERVAL);
@@ -262,7 +262,7 @@ const QueuePage = () => {
                   id="planCode"
                   value={planCodeInput}
                   onChange={(e) => setPlanCodeInput(e.target.value)}
-                  placeholder="例如: advance-1"
+                  placeholder="例如: 24sk202"
                   className="w-full cyber-input bg-cyber-surface text-cyber-text border-cyber-border focus:ring-cyber-primary focus:border-cyber-primary"
                 />
               </div>
