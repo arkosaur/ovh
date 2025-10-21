@@ -17,9 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Cpu, Database, Wifi, HardDrive, CheckSquare, Square, Settings, ArrowRightLeft, Clock } from "lucide-react";
 import { apiEvents } from "@/context/APIContext";
 import { OVH_DATACENTERS, DatacenterInfo } from "@/config/ovhConstants"; // Import from new location
-
-// Backend API URL (update this to match your backend)
-const API_URL = 'http://localhost:5000/api';
+import { API_URL } from "@/config/constants";
 
 // 定义缓存相关的常量
 const CACHE_KEY = 'ovh-servers-cache';

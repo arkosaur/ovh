@@ -2,9 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import axios from "axios";
 import { toast } from "sonner";
-
-// Backend API URL (update this to match your backend)
-const API_URL = 'http://localhost:5000/api';
+import { API_URL } from "@/config/constants";
 
 interface PurchaseHistory {
   id: string;

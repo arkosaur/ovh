@@ -5,8 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Database, Trash2, RefreshCw, HardDrive, Clock, Server, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import axios from "axios";
-
-const API_URL = 'http://localhost:5000/api';
+import { API_URL } from "@/config/constants";
 
 interface CacheInfo {
   backend: {

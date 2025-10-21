@@ -1,9 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
-
-// Backend API URL (update this to match your backend)
-const API_URL = 'http://localhost:5000/api';
+import { API_URL } from '@/config/constants';
 
 // 创建一个事件总线，用于在API认证状态变化时通知其他组件
 export const apiEvents = {

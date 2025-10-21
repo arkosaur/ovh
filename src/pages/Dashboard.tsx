@@ -4,9 +4,7 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useAPI } from "@/context/APIContext";
 import axios from "axios";
-
-// Backend API URL (update this to match your backend)
-const API_URL = 'http://localhost:5000/api';
+import { API_URL } from "@/config/constants";
 
 interface StatsType {
   activeQueues: number;
