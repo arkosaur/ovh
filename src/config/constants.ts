@@ -68,6 +68,13 @@ export const CACHE_KEY = 'ovh-servers-cache';
 export const API_URL = 'http://localhost:5000/api';
 
 /**
+ * API通信密钥
+ * 用于验证前端请求，防止后端被直接调用
+ * 生产环境请更换为复杂的随机字符串
+ */
+export const API_SECRET_KEY = 'ovh-phantom-sniper-2024-secret-key';
+
+/**
  * API请求重试次数
  */
 export const API_RETRY_COUNT = 1;

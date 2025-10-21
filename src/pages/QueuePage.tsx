@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAPI } from "@/context/APIContext";
-import axios from "axios";
+import { api } from "@/utils/apiClient";
 import { toast } from "sonner";
 import { XIcon, RefreshCwIcon, PlusIcon, SearchIcon, PlayIcon, PauseIcon, Trash2Icon, ArrowUpDownIcon, HeartIcon } from 'lucide-react';
 import { 
@@ -52,7 +52,7 @@ const QueuePage = () => {
   const { isAuthenticated } = useAPI();
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(true);
+  const [showAddForm, setShowAddForm] = useState(false); // 默认收起表单
   const [servers, setServers] = useState<ServerPlan[]>([]);
   const [planCodeInput, setPlanCodeInput] = useState<string>("");
   const [selectedServer, setSelectedServer] = useState<ServerPlan | null>(null);
@@ -63,7 +63,7 @@ const QueuePage = () => {
   const fetchQueueItems = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`${API_URL}/queue`);
+      const response = await api.get(`/queue`);
       setQueueItems(response.data);
     } catch (error) {
       console.error("Error fetching queue items:", error);
@@ -76,7 +76,7 @@ const QueuePage = () => {
   // Fetch servers for the add form
   const fetchServers = async () => {
     try {
-      const response = await axios.get(`${API_URL}/servers`, {
+      const response = await api.get(`/servers`, {
         params: { showApiServers: isAuthenticated },
       });
       
@@ -101,7 +101,7 @@ const QueuePage = () => {
 
     for (const dc of selectedDatacenters) {
     try {
-      await axios.post(`${API_URL}/queue`, {
+      await api.post(`/queue`, {
           planCode: planCodeInput.trim(),
           datacenter: dc,
         retryInterval: retryInterval,
@@ -132,7 +132,7 @@ const QueuePage = () => {
   // Remove queue item
   const removeQueueItem = async (id: string) => {
     try {
-      await axios.delete(`${API_URL}/queue/${id}`);
+      await api.delete(`/queue/${id}`);
       toast.success("已从队列中移除");
       fetchQueueItems();
     } catch (error) {
@@ -146,7 +146,7 @@ const QueuePage = () => {
     const newStatus = currentStatus === "running" ? "pending" : "running";
     
     try {
-      await axios.put(`${API_URL}/queue/${id}/status`, {
+      await api.put(`/queue/${id}/status`, {
         status: newStatus,
       });
       

@@ -4,8 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Database, Trash2, RefreshCw, HardDrive, Clock, Server, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
-import axios from "axios";
-import { API_URL } from "@/config/constants";
+import { api } from "@/utils/apiClient";
 
 interface CacheInfo {
   backend: {
@@ -56,7 +55,7 @@ export const CacheManager = () => {
   const fetchCacheInfo = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`${API_URL}/cache/info`);
+      const response = await api.get(`/cache/info`);
       setCacheInfo(response.data);
     } catch (error) {
       console.error("获取缓存信息失败:", error);
@@ -83,7 +82,7 @@ export const CacheManager = () => {
   const clearBackendCache = async (type: 'all' | 'memory' | 'files' = 'all') => {
     setIsClearingCache(true);
     try {
-      const response = await axios.post(`${API_URL}/cache/clear`, { type });
+      const response = await api.post(`/cache/clear`, { type });
       toast.success(response.data.message || "已清除后端缓存");
       fetchCacheInfo();
     } catch (error) {
@@ -172,10 +171,10 @@ export const CacheManager = () => {
             </Button>
             <Button 
               onClick={clearAllCache} 
-              variant="destructive"
+              variant="outline"
               disabled={isClearingCache}
               size="sm"
-              className="w-full text-xs"
+              className="w-full text-xs border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500/50"
             >
               <Trash2 className="w-3 h-3 mr-1.5" />
               清除所有缓存

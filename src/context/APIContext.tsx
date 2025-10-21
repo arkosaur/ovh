@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import axios from 'axios';
+import { api } from '@/utils/apiClient';
 import { toast } from 'sonner';
-import { API_URL } from '@/config/constants';
 
 // 创建一个事件总线，用于在API认证状态变化时通知其他组件
 export const apiEvents = {
@@ -61,7 +60,7 @@ export const API_Provider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const loadAPIKeys = async () => {
       try {
-        const response = await axios.get(`${API_URL}/settings`);
+        const response = await api.get(`/settings`);
         const data = response.data;
         
         if (data && data.appKey) {
@@ -93,7 +92,7 @@ export const API_Provider = ({ children }: { children: ReactNode }) => {
   const setAPIKeys = async (keys: APIKeysType): Promise<void> => {
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/settings`, {
+      const response = await api.post(`/settings`, {
         appKey: keys.appKey,
         appSecret: keys.appSecret,
         consumerKey: keys.consumerKey,
@@ -128,7 +127,7 @@ export const API_Provider = ({ children }: { children: ReactNode }) => {
   // Check authentication status with backend
   const checkAuthentication = async (): Promise<boolean> => {
     try {
-      const response = await axios.post(`${API_URL}/verify-auth`, {
+      const response = await api.post(`/verify-auth`, {
         appKey,
         appSecret,
         consumerKey,

@@ -13,6 +13,9 @@ import re
 import traceback
 import requests
 
+# 导入API认证中间件
+from api_auth_middleware import init_api_auth
+
 # Data storage directories
 DATA_DIR = "data"
 CACHE_DIR = "cache"
@@ -35,6 +38,9 @@ logging.basicConfig(
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
+
+# 初始化API密钥验证
+init_api_auth(app)
 
 # Data storage files (organized in data directory)
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")

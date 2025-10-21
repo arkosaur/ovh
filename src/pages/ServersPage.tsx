@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useAPI } from "@/context/APIContext";
-import axios from "axios";
+import { api } from "@/utils/apiClient";
 import { toast } from "sonner";
 import {
   Table,
@@ -171,7 +171,7 @@ const ServersPage = () => {
     setIsActuallyFetching(true); // 标记开始从API获取
     try {
       console.log(`开始从API获取服务器数据... (forceRefresh: ${forceRefresh})`);
-      const response = await axios.get(`${API_URL}/servers`, {
+      const response = await api.get(`/servers`, {
         params: { 
           showApiServers: isAuthenticated,
           forceRefresh: forceRefresh 
@@ -587,7 +587,7 @@ const ServersPage = () => {
         params.options = selectedOpts.join(',');
       }
       
-      const response = await axios.get(`${API_URL}/availability/${planCode}`, { params });
+      const response = await api.get(`/availability/${planCode}`, { params });
       console.log(`获取到 ${planCode} 的可用性数据 (配置: ${selectedOpts.join(', ') || '默认'}):`, response.data);
       
       // OVH API返回的数据中心代码可能与前端不一致，需要映射
@@ -777,7 +777,7 @@ const ServersPage = () => {
 
       // 为每个选中的数据中心创建一个抢购请求
       const promises = datacenters.map(datacenter => 
-        axios.post(`${API_URL}/queue`, {
+        api.post(`/queue`, {
           planCode: server.planCode,
           datacenter,
           options: userSelectedOptions,

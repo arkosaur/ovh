@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import axios from "axios";
+import { api } from "@/utils/apiClient";
 import { toast } from "sonner";
-import { API_URL } from "@/config/constants";
 
 interface PurchaseHistory {
   id: string;
@@ -27,7 +26,7 @@ const HistoryPage = () => {
   const fetchHistory = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`${API_URL}/purchase-history`);
+      const response = await api.get(`/purchase-history`);
       setHistory(response.data);
       setFilteredHistory(response.data);
     } catch (error) {
@@ -45,7 +44,7 @@ const HistoryPage = () => {
     }
     
     try {
-      await axios.delete(`${API_URL}/purchase-history`);
+      await api.delete(`/purchase-history`);
       toast.success("已清空购买历史记录");
       fetchHistory();
     } catch (error) {

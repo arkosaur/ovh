@@ -1,8 +1,7 @@
 
 import { useState, useEffect, useRef } from "react";
-import axios from "axios";
+import { api } from "@/utils/apiClient";
 import { toast } from "sonner";
-import { API_URL } from "@/config/constants";
 
 interface LogEntry {
   id: string;
@@ -24,7 +23,7 @@ const LogsPage = () => {
   // Fetch logs
   const fetchLogs = async () => {
     try {
-      const response = await axios.get(`${API_URL}/logs`);
+      const response = await api.get(`/logs`);
       setLogs(response.data);
     } catch (error) {
       console.error("Error fetching logs:", error);
@@ -44,7 +43,7 @@ const LogsPage = () => {
     }
     
     try {
-      await axios.delete(`${API_URL}/logs`);
+      await api.delete(`/logs`);
       toast.success("已清空日志");
       fetchLogs();
     } catch (error) {

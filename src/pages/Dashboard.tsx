@@ -3,8 +3,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useAPI } from "@/context/APIContext";
-import axios from "axios";
-import { API_URL } from "@/config/constants";
+import { api } from "@/utils/apiClient";
 
 interface StatsType {
   activeQueues: number;
@@ -40,8 +39,8 @@ const Dashboard = () => {
     const fetchData = async () => {
       try {
         const [statsResponse, queueResponse] = await Promise.all([
-          axios.get(`${API_URL}/stats`),
-          axios.get(`${API_URL}/queue`)
+          api.get(`/stats`),
+          api.get(`/queue`)
         ]);
         setStats(statsResponse.data);
         // 只显示活跃的队列项（running, pending, paused），最多3个
