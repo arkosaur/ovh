@@ -115,10 +115,7 @@ const ServersPage = () => {
       const { data, timestamp } = JSON.parse(cacheData);
       if (!data || !Array.isArray(data)) return false;
       
-      console.log("从缓存加载服务器数据...");
-      setServers(data);
-      setFilteredServers(data);
-      setLastUpdated(new Date(timestamp));
+      console.log(`💾 从缓存加载服务器数据... (${data.length} 台服务器)`);
       
       // 初始化数据中心选择状态
       const dcSelections: Record<string, Record<string, boolean>> = {};
@@ -131,7 +128,17 @@ const ServersPage = () => {
       });
       
       setSelectedDatacenters(dcSelections);
+      setServers(data);
+      
+      // 立即设置filteredServers，避免等待useEffect
+      if (!searchTerm && selectedDatacenter === "all") {
+        setFilteredServers(data);
+      }
+      
+      setLastUpdated(new Date(timestamp));
       setIsLoading(false);
+      
+      console.log(`✅ 缓存数据加载完成: ${data.length} 台服务器`);
       return true;
     } catch (error) {
       console.error("加载缓存数据出错:", error);
@@ -249,14 +256,24 @@ const ServersPage = () => {
       });
       
       setSelectedDatacenters(dcSelections);
+      
+      // 先设置服务器数据，让useEffect来处理过滤
       setServers(formattedServers);
-      setFilteredServers(formattedServers);
+      
+      // 如果没有搜索词和数据中心过滤，直接设置filteredServers
+      // 这样可以立即显示数据，避免等待useEffect执行
+      if (!searchTerm && selectedDatacenter === "all") {
+        setFilteredServers(formattedServers);
+      }
+      
       setIsLoading(false); // isLoading 在这里可以先置为false，因为数据已获取并设置
       // 更新最后刷新时间
       setLastUpdated(new Date());
       
       // 保存到缓存
       saveToCache(formattedServers);
+      
+      console.log(`✅ 服务器数据已设置: ${formattedServers.length} 台服务器`);
       
       // 检查是否有服务器缺少硬件信息
       const missingInfoServers = formattedServers.filter(
@@ -267,9 +284,22 @@ const ServersPage = () => {
         console.warn("以下服务器缺少硬件信息:", missingInfoServers.map(s => s.planCode).join(", "));
       }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("获取服务器列表时出错:", error);
-      toast.error("获取服务器列表失败");
+      
+      // 更详细的错误提示
+      let errorMessage = "获取服务器列表失败";
+      if (error.response?.status === 401) {
+        errorMessage = "认证失败，请检查API配置";
+      } else if (error.response?.status === 403) {
+        errorMessage = "API密钥无效或权限不足";
+      } else if (!isAuthenticated) {
+        errorMessage = "请先配置OVH API密钥";
+      } else if (error.message) {
+        errorMessage = `获取服务器列表失败: ${error.message}`;
+      }
+      
+      toast.error(errorMessage);
       setIsLoading(false); // 确保isLoading在出错时也更新
       
       // 如果API请求失败但有缓存数据，尝试从缓存加载
@@ -833,9 +863,13 @@ const ServersPage = () => {
     // 后端缓存2小时，避免频繁API调用
     
     // Subscribe to auth change events
-    const unsubscribe = apiEvents.onAuthChanged(() => {
-      console.log("认证状态改变事件触发，强制刷新服务器列表");
-      fetchServers(true); // 认证状态改变时强制刷新
+    const unsubscribe = apiEvents.onAuthChanged((newAuthState) => {
+      console.log("认证状态改变事件触发，新状态:", newAuthState);
+      console.log("强制刷新服务器列表...");
+      // 使用setTimeout确保状态已更新
+      setTimeout(() => {
+        fetchServers(true); // 认证状态改变时强制刷新
+      }, 100);
     });
     
     return () => {
@@ -845,7 +879,12 @@ const ServersPage = () => {
 
   // Apply filters when search term or datacenter changes
   useEffect(() => {
-    if (servers.length === 0) return;
+    if (servers.length === 0) {
+      console.log("⏳ 服务器列表为空，跳过过滤");
+      return;
+    }
+    
+    console.log(`🔍 应用过滤条件 - 搜索词: "${searchTerm}", 数据中心: "${selectedDatacenter}"`);
     
     let filtered = [...servers];
     
@@ -859,14 +898,17 @@ const ServersPage = () => {
           server.cpu.toLowerCase().includes(term) ||
           server.memory.toLowerCase().includes(term)
       );
+      console.log(`   搜索后剩余: ${filtered.length} 台服务器`);
     }
     
     // Apply datacenter filter - 现在所有服务器都支持所有数据中心
     if (selectedDatacenter !== "all") {
       // 所有服务器都保留，因为我们假设每个服务器都可以在所有数据中心部署
       // 实际应用中可能需要根据API返回的真实可用性进行过滤
+      console.log(`   数据中心过滤: ${selectedDatacenter} (暂不实际过滤)`);
     }
     
+    console.log(`✅ 过滤完成，显示 ${filtered.length} 台服务器`);
     setFilteredServers(filtered);
   }, [searchTerm, selectedDatacenter, servers]);
 
