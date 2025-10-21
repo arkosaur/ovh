@@ -160,12 +160,12 @@ export const CacheManager = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* 操作按钮 */}
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <Button 
               onClick={fetchCacheInfo} 
               disabled={isLoading}
               variant="outline"
-              className="flex-1 min-w-[140px]"
+              className="w-full"
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               刷新信息
@@ -174,7 +174,7 @@ export const CacheManager = () => {
               onClick={clearAllCache} 
               variant="destructive"
               disabled={isClearingCache}
-              className="flex-1 min-w-[140px]"
+              className="w-full"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               清除所有缓存
@@ -325,12 +325,12 @@ export const CacheManager = () => {
                 </div>
 
                 {/* 操作按钮 */}
-                <div className="flex gap-2 pt-2">
+                <div className="grid grid-cols-2 gap-2 pt-2">
                   <Button 
                     onClick={() => clearBackendCache('memory')} 
                     variant="outline" 
                     size="sm"
-                    className="flex-1 border-blue-500/30 hover:bg-blue-500/10"
+                    className="w-full border-blue-500/30 hover:bg-blue-500/10"
                     disabled={isClearingCache}
                   >
                     <Trash2 className="w-3 h-3 mr-2" />
@@ -340,7 +340,7 @@ export const CacheManager = () => {
                     onClick={() => clearBackendCache('files')} 
                     variant="outline" 
                     size="sm"
-                    className="flex-1 border-blue-500/30 hover:bg-blue-500/10"
+                    className="w-full border-blue-500/30 hover:bg-blue-500/10"
                     disabled={isClearingCache}
                   >
                     <Trash2 className="w-3 h-3 mr-2" />
