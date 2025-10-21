@@ -324,7 +324,7 @@ npm run dev
 ```
   VITE v5.x.x  ready in xxx ms
 
-  ➜  Local:   http://localhost:5173/
+  ➜  Local:   http://localhost:8080/
   ➜  Network: use --host to expose
 ```
 
@@ -334,7 +334,7 @@ npm run dev
 
 ### 1. 访问前端
 
-打开浏览器访问：**http://localhost:5173**
+打开浏览器访问：**http://localhost:8080**
 
 ### 2. 输入前端密码
 
@@ -490,7 +490,7 @@ app.run(host='0.0.0.0', port=5000, debug=True)  # 修改port
 ```typescript
 export default defineConfig({
   server: {
-    port: 5173  // 修改这里
+    port: 8080  // 修改这里
   }
 })
 ```
@@ -518,17 +518,11 @@ export const API_TIMEOUT = 120000;  // 120秒，可根据需要调整
 
 如果遇到问题：
 
-1. **查看文档**
-   - `README.md` - 项目说明
-   - `SIMPLE_PASSWORD_GUIDE.md` - 密码配置
-   - `SECURITY.md` - 安全配置
-   - `TIMEOUT_FIX.md` - 超时问题
-
-2. **查看日志**
+1. **查看日志**
    - 前端：浏览器控制台（F12）
    - 后端：`backend/logs/app.log`
 
-3. **常见问题**
+2. **常见问题**
    - 查看 `README.md` 中的"常见问题"部分
 
 ---
