@@ -578,10 +578,19 @@ const ServersPage = () => {
     setIsCheckingAvailability(true);
     setSelectedServer(planCode);
     try {
+      // 获取用户选择的配置选项
+      const selectedOpts = selectedOptions[planCode] || [];
+      
       // 直接使用完整的planCode查询（包括数据中心后缀）
-      // 后端API会处理这些特殊型号
-      const response = await axios.get(`${API_URL}/availability/${planCode}`);
-      console.log(`获取到 ${planCode} 的可用性数据:`, response.data);
+      // 如果用户选择了自定义配置，传递这些选项
+      const params: any = {};
+      if (selectedOpts.length > 0) {
+        // 将选项数组转换为逗号分隔的字符串
+        params.options = selectedOpts.join(',');
+      }
+      
+      const response = await axios.get(`${API_URL}/availability/${planCode}`, { params });
+      console.log(`获取到 ${planCode} 的可用性数据 (配置: ${selectedOpts.join(', ') || '默认'}):`, response.data);
       
       // OVH API返回的数据中心代码可能与前端不一致，需要映射
       // 例如：API返回 "ynm" (孟买)，但前端使用 "mum"

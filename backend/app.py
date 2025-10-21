@@ -238,7 +238,7 @@ def get_ovh_client():
         return None
 
 # Check availability of servers
-def check_server_availability(plan_code):
+def check_server_availability(plan_code, options=None):
     client = get_ovh_client()
     if not client:
         return None
@@ -246,7 +246,22 @@ def check_server_availability(plan_code):
     try:
         # 对于带数据中心后缀的planCode（如24rise012-mum），OVH API可能不认识
         # 直接使用完整的planCode查询，让OVH API返回实际数据
-        availabilities = client.get('/dedicated/server/datacenter/availabilities', planCode=plan_code)
+        # 构建查询参数
+        params = {'planCode': plan_code}
+        
+        # 如果提供了配置选项，添加到查询参数中
+        if options and len(options) > 0:
+            # OVH API使用'addonFamily'参数来指定额外配置
+            # 将选项数组作为多个参数传递
+            for option in options:
+                # 添加每个选项到查询参数
+                if 'addonFamily' not in params:
+                    params['addonFamily'] = []
+                if not isinstance(params['addonFamily'], list):
+                    params['addonFamily'] = [params['addonFamily']]
+                params['addonFamily'].append(option)
+        
+        availabilities = client.get('/dedicated/server/datacenter/availabilities', **params)
         result = {}
         
         for item in availabilities:
@@ -265,7 +280,8 @@ def check_server_availability(plan_code):
                     # 任何非"unavailable"或"unknown"的状态都被视为"available"
                     result[datacenter_name] = availability
                 
-        add_log("INFO", f"成功检查 {plan_code} 的可用性: {result}")
+        config_info = f" (配置: {', '.join(options)})" if options else " (默认配置)"
+        add_log("INFO", f"成功检查 {plan_code}{config_info} 的可用性: {result}")
         return result
     except Exception as e:
         add_log("ERROR", f"Failed to check availability for {plan_code}: {str(e)}")
@@ -1876,7 +1892,11 @@ def get_servers():
 
 @app.route('/api/availability/<plan_code>', methods=['GET'])
 def get_availability(plan_code):
-    availability = check_server_availability(plan_code)
+    # 获取配置选项参数（逗号分隔的字符串）
+    options_str = request.args.get('options', '')
+    options = [opt.strip() for opt in options_str.split(',') if opt.strip()] if options_str else []
+    
+    availability = check_server_availability(plan_code, options)
     if availability:
         return jsonify(availability)
     else:
