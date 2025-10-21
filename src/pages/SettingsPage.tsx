@@ -390,22 +390,45 @@ const SettingsPage = () => {
                 
                 <div className="cyber-grid-line pt-4">
                   <h3 className="font-medium mb-2">获取 OVH API 密钥</h3>
-                  <p className="text-cyber-muted text-sm mb-2">
-                    您需要从 OVH API 获取 APP KEY、APP SECRET 和 CONSUMER KEY 才能使用本服务。
+                  <p className="text-cyber-muted text-sm mb-3">
+                    您需要从 OVH API 控制台获取 APP KEY、APP SECRET 和 CONSUMER KEY 才能使用本服务。
                   </p>
-                  <a 
-                    href="https://api.ovh.com/createToken/" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="cyber-button text-xs mt-2 inline-flex items-center"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
-                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                      <polyline points="15 3 21 3 21 9"></polyline>
-                      <line x1="10" y1="14" x2="21" y2="3"></line>
-                    </svg>
-                    获取 API 密钥
-                  </a>
+                  
+                  <div className="space-y-2">
+                    <p className="text-xs text-cyber-muted font-semibold mb-2">选择您的区域：</p>
+                    
+                    <a 
+                      href="https://eu.api.ovh.com/createToken/" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="cyber-button text-xs w-full inline-flex items-center justify-center"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                        <polyline points="15 3 21 3 21 9"></polyline>
+                        <line x1="10" y1="14" x2="21" y2="3"></line>
+                      </svg>
+                      EU区域 (欧洲)
+                    </a>
+                    
+                    <a 
+                      href="https://ca.api.ovh.com/createToken/" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="cyber-button text-xs w-full inline-flex items-center justify-center"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                        <polyline points="15 3 21 3 21 9"></polyline>
+                        <line x1="10" y1="14" x2="21" y2="3"></line>
+                      </svg>
+                      CA区域 (加拿大)
+                    </a>
+                  </div>
+                  
+                  <p className="text-xs text-cyan-400 mt-3">
+                    💡 提示：大部分用户使用EU区域
+                  </p>
                 </div>
                 
                 <div className="cyber-grid-line pt-4">

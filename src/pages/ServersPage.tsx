@@ -1387,8 +1387,8 @@ const ServersPage = () => {
 
       {/* Filters and controls */}
       <div className="cyber-panel p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative">
+        <div className="flex items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-muted">
                 <circle cx="11" cy="11" r="8"></circle>
@@ -1402,21 +1402,6 @@ const ServersPage = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="cyber-input pl-10 w-full"
             />
-          </div>
-          
-          <div>
-            <select
-              value={selectedDatacenter}
-              onChange={(e) => setSelectedDatacenter(e.target.value)}
-              className="cyber-input w-full"
-            >
-              <option value="all">所有数据中心</option>
-              {OVH_DATACENTERS.map((dc) => (
-                <option key={dc.code} value={dc.code.toUpperCase()}>
-                  {dc.code.toUpperCase()} - {dc.name} ({dc.region})
-                </option>
-              ))}
-            </select>
           </div>
           
           <div className="flex items-center justify-end space-x-4">

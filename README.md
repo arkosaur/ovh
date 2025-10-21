@@ -20,7 +20,9 @@
 ### API设置
 ![API设置](https://raw.githubusercontent.com/coolci/OVH/main/UI/API.png)
 
-## 🚀 运行说明
+## 🚀 快速开始
+
+**⭐ 首次使用？** 请查看详细配置指南：[首次运行.md](./首次运行.md)
 
 ### 前端运行
 
