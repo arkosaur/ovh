@@ -1,6 +1,5 @@
 
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -124,14 +123,10 @@ const LogsPage = () => {
 
   return (
     <div className="space-y-6">
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
+      <div>
         <h1 className="text-3xl font-bold mb-1 cyber-glow-text">详细日志</h1>
         <p className="text-cyber-muted mb-6">查看系统运行日志记录</p>
-      </motion.div>
+      </div>
 
       {/* Filters and controls */}
       <div className="cyber-panel p-4 mb-6">
@@ -208,10 +203,17 @@ const LogsPage = () => {
 
       {/* Logs display */}
       <div className="cyber-panel">
-        <div className="flex justify-between items-center p-4 border-b border-cyber-grid/30">
-          <h2 className="font-bold">系统日志</h2>
-          <div className="text-cyber-muted text-sm">
-            {filteredLogs.length} 条日志
+        <div className="flex justify-between items-center px-3 py-2 border-b border-cyber-grid/30 bg-cyber-grid/5">
+          <h2 className="font-semibold text-sm">系统日志</h2>
+          <div className="flex items-center gap-3">
+            <div className="text-cyber-muted text-xs">
+              共 {filteredLogs.length} 条
+            </div>
+            {logs.length > 0 && (
+              <div className="text-[10px] text-cyber-accent/60">
+                最新: {new Date(logs[logs.length - 1]?.timestamp).toLocaleTimeString()}
+              </div>
+            )}
           </div>
         </div>
         
@@ -233,32 +235,51 @@ const LogsPage = () => {
             <p className="text-cyber-muted">没有日志记录</p>
           </div>
         ) : (
-          <div className="p-1 max-h-[600px] overflow-y-auto font-mono text-sm">
-            {filteredLogs.map((log) => (
-              <motion.div
-                key={log.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-2 border-b border-cyber-grid/10 hover:bg-cyber-grid/5"
-              >
-                <div className="flex items-start">
-                  <div className="flex-shrink-0 w-28 text-cyber-muted">
-                    {new Date(log.timestamp).toLocaleTimeString()}
-                  </div>
-                  <div className="flex-shrink-0 w-20">
-                    <span className={`px-2 py-0.5 rounded text-xs ${getLogLevelStyle(log.level)}`}>
-                      {log.level}
-                    </span>
-                  </div>
-                  <div className="flex-shrink-0 w-24 text-cyber-muted">
-                    [{log.source}]
-                  </div>
-                  <div className="flex-1 break-all whitespace-pre-wrap">
-                    {log.message}
+          <div className="max-h-[600px] overflow-y-auto">
+            <div className="divide-y divide-cyber-grid/10">
+              {filteredLogs.map((log, index) => (
+                <div
+                  key={log.id}
+                  className="px-3 py-2 hover:bg-cyber-grid/5 transition-colors"
+                >
+                  <div className="flex items-start gap-2 text-xs">
+                    {/* 序号 */}
+                    <div className="flex-shrink-0 w-10 text-cyber-muted/60 text-right font-mono">
+                      {filteredLogs.length - index}
+                    </div>
+                    
+                    {/* 时间戳 */}
+                    <div className="flex-shrink-0 w-32 text-cyber-muted font-mono">
+                      {new Date(log.timestamp).toLocaleString('zh-CN', {
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                      }).replace(/\//g, '-')}
+                    </div>
+                    
+                    {/* 级别 */}
+                    <div className="flex-shrink-0">
+                      <span className={`inline-flex items-center justify-center w-16 px-1.5 py-0.5 rounded text-[10px] font-semibold ${getLogLevelStyle(log.level)}`}>
+                        {log.level}
+                      </span>
+                    </div>
+                    
+                    {/* 来源 */}
+                    <div className="flex-shrink-0 w-20 text-cyber-accent/80 font-mono text-[10px] truncate" title={log.source}>
+                      {log.source}
+                    </div>
+                    
+                    {/* 消息 */}
+                    <div className="flex-1 text-slate-200 leading-relaxed break-words">
+                      {log.message}
+                    </div>
                   </div>
                 </div>
-              </motion.div>
-            ))}
+              ))}
+            </div>
             <div ref={logEndRef} />
           </div>
         )}
