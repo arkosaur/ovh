@@ -16,6 +16,7 @@ const Sidebar = ({ onToggle, isOpen }: SidebarProps) => {
   const menuItems = [
     { path: "/", icon: "bar-chart-2", label: "仪表盘" },
     { path: "/servers", icon: "server", label: "服务器列表" },
+    { path: "/availability", icon: "database", label: "实时可用性" },
     { path: "/queue", icon: "clipboard-list", label: "抢购队列" },
     { path: "/history", icon: "clock", label: "抢购历史" },
     { path: "/logs", icon: "file-text", label: "详细日志" },
@@ -96,6 +97,13 @@ const Sidebar = ({ onToggle, isOpen }: SidebarProps) => {
                     <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
                     <line x1="6" y1="6" x2="6.01" y2="6"></line>
                     <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                  </>
+                )}
+                {item.icon === "database" && (
+                  <>
+                    <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
                   </>
                 )}
                 {item.icon === "clipboard-list" && (

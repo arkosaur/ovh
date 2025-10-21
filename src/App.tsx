@@ -12,6 +12,7 @@ import QueuePage from "./pages/QueuePage";
 import HistoryPage from "./pages/HistoryPage";
 import LogsPage from "./pages/LogsPage";
 import SettingsPage from "./pages/SettingsPage";
+import OVHAvailabilityPage from "./pages/OVHAvailabilityPage";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
 
@@ -35,6 +36,7 @@ const App = () => (
               <Route path="/" element={<Layout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="servers" element={<ServersPage />} />
+                <Route path="availability" element={<OVHAvailabilityPage />} />
                 <Route path="queue" element={<QueuePage />} />
                 <Route path="history" element={<HistoryPage />} />
                 <Route path="logs" element={<LogsPage />} />
