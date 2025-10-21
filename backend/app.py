@@ -796,9 +796,10 @@ def load_server_list():
                     # 尝试寻找更具体的信息
                     # 保存原始数据以便分析
                     try:
-                        with open(f"sysle_server_{plan_code}.json", "w") as f:
+                        debug_file = os.path.join(CACHE_DIR, f"sysle_server_{plan_code}.json")
+                        with open(debug_file, "w") as f:
                             json.dump(plan, f, indent=2)
-                        add_log("INFO", f"已保存SYSLE服务器{plan_code}的原始数据")
+                        add_log("INFO", f"已保存SYSLE服务器{plan_code}的原始数据到cache目录")
                     except Exception as e:
                         add_log("WARNING", f"保存SYSLE服务器数据时出错: {str(e)}")
                     
@@ -852,9 +853,10 @@ def load_server_list():
                     # 尝试寻找更具体的信息
                     # 保存原始数据以便分析
                     try:
-                        with open(f"sk_server_{plan_code}.json", "w") as f:
+                        debug_file = os.path.join(CACHE_DIR, f"sk_server_{plan_code}.json")
+                        with open(debug_file, "w") as f:
                             json.dump(plan, f, indent=2)
-                        add_log("INFO", f"已保存SK服务器{plan_code}的原始数据")
+                        add_log("INFO", f"已保存SK服务器{plan_code}的原始数据到cache目录")
                     except Exception as e:
                         add_log("WARNING", f"保存SK服务器数据时出错: {str(e)}")
                     
@@ -1000,9 +1002,10 @@ def load_server_list():
                     if plan.get("addonFamilies") and isinstance(plan.get("addonFamilies"), list):
                         # 尝试保存完整的addonFamilies数据用于更深入分析
                         try:
-                            with open(f"addonFamilies_{plan_code}.json", "w") as f:
+                            debug_file = os.path.join(CACHE_DIR, f"addonFamilies_{plan_code}.json")
+                            with open(debug_file, "w") as f:
                                 json.dump(plan.get("addonFamilies"), f, indent=2)
-                            add_log("INFO", f"已保存服务器 {plan_code} 的addonFamilies数据")
+                            add_log("INFO", f"已保存服务器 {plan_code} 的addonFamilies数据到cache目录")
                         except Exception as e:
                             add_log("WARNING", f"保存addonFamilies数据时出错: {str(e)}")
                         
@@ -1027,9 +1030,10 @@ def load_server_list():
                                     })
                             
                             if bandwidth_options:
-                                with open(f"bandwidth_options_{plan_code}.json", "w") as f:
+                                debug_file = os.path.join(CACHE_DIR, f"bandwidth_options_{plan_code}.json")
+                                with open(debug_file, "w") as f:
                                     json.dump(bandwidth_options, f, indent=2)
-                                add_log("INFO", f"已保存{plan_code}的带宽选项到bandwidth_options_{plan_code}.json")
+                                add_log("INFO", f"已保存{plan_code}的带宽选项到cache目录")
                         except Exception as e:
                             add_log("WARNING", f"保存带宽选项时出错: {str(e)}")
                         
@@ -1119,7 +1123,8 @@ def load_server_list():
                                                     
                                                     # 保存到文件以便更详细分析
                                                     try:
-                                                        with open(f"cpu_options_{plan_code}.json", "w") as f:
+                                                        debug_file = os.path.join(CACHE_DIR, f"cpu_options_{plan_code}.json")
+                                                        with open(debug_file, "w") as f:
                                                             json.dump({"options": cpu_options, "default": default_value}, f, indent=2)
                                                     except Exception as e:
                                                         add_log("WARNING", f"保存CPU选项时出错: {str(e)}")
@@ -1309,7 +1314,8 @@ def load_server_list():
                 
                 # 保存原始数据用于调试
                 try:
-                    with open(f"server_details_{plan_code}.json", "w") as f:
+                    debug_file = os.path.join(CACHE_DIR, f"server_details_{plan_code}.json")
+                    with open(debug_file, "w") as f:
                         json.dump({
                             "name": server_name,
                             "description": server_desc,
@@ -1545,23 +1551,23 @@ def load_server_list():
 # 保存完整的API原始响应用于调试分析
 def save_raw_api_response(client, zone):
     try:
-        # 创建目录用于存储API响应
-        if not os.path.exists("api_responses"):
-            os.makedirs("api_responses")
+        # 使用cache目录存储API响应
+        api_responses_dir = os.path.join(CACHE_DIR, "api_responses")
+        os.makedirs(api_responses_dir, exist_ok=True)
         
         # 获取目录并保存
         catalog = client.get(f'/order/catalog/public/eco?ovhSubsidiary={zone}')
-        with open(os.path.join("api_responses", "catalog_response.json"), "w") as f:
+        with open(os.path.join(api_responses_dir, "catalog_response.json"), "w") as f:
             json.dump(catalog, f, indent=2)
         
-        add_log("INFO", "已保存目录API原始响应")
+        add_log("INFO", "已保存目录API原始响应到cache目录")
         
         # 获取可用的服务器列表
         available_servers = client.get('/dedicated/server/datacenter/availabilities')
-        with open(os.path.join("api_responses", "availability_response.json"), "w") as f:
+        with open(os.path.join(api_responses_dir, "availability_response.json"), "w") as f:
             json.dump(available_servers, f, indent=2)
         
-        add_log("INFO", "已保存可用性API原始响应")
+        add_log("INFO", "已保存可用性API原始响应到cache目录")
         
         # 尝试获取一些具体服务器的详细信息
         if available_servers and len(available_servers) > 0:
@@ -1570,9 +1576,9 @@ def save_raw_api_response(client, zone):
                 if server_code:
                     try:
                         server_details = client.get(f'/order/catalog/formatted/eco?planCode={server_code}&ovhSubsidiary={zone}')
-                        with open(os.path.join("api_responses", f"server_details_{server_code}.json"), "w") as f:
+                        with open(os.path.join(api_responses_dir, f"server_details_{server_code}.json"), "w") as f:
                             json.dump(server_details, f, indent=2)
-                        add_log("INFO", f"已保存服务器{server_code}的详细API响应")
+                        add_log("INFO", f"已保存服务器{server_code}的详细API响应到cache目录")
                     except Exception as e:
                         add_log("WARNING", f"获取服务器{server_code}详细信息时出错: {str(e)}")
         
