@@ -1549,7 +1549,26 @@ const ServersPage = () => {
                     {/* 数据中心列表 - 采用用户截图样式，一行1-2列 */}
                     <div className="bg-slate-900/10 p-3">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {OVH_DATACENTERS.map(dc => {
+                        {OVH_DATACENTERS
+                          .filter(dc => {
+                            // 如果服务器代码包含特定数据中心后缀，只显示对应的数据中心
+                            const planCodeLower = server.planCode.toLowerCase();
+                            
+                            // 检查是否为特定区域的服务器（通过后缀判断）
+                            if (planCodeLower.includes('-sgp')) {
+                              return dc.code === 'sgp';
+                            }
+                            if (planCodeLower.includes('-syd')) {
+                              return dc.code === 'syd';
+                            }
+                            if (planCodeLower.includes('-mum')) {
+                              return dc.code === 'mum'; // 孟买（如果存在）
+                            }
+                            
+                            // 默认显示所有数据中心
+                            return true;
+                          })
+                          .map(dc => {
                               const dcCode = dc.code.toUpperCase();
                           // Ensure availability and selectedDatacenters are correctly scoped to the current server
                               const availStatus = availability[server.planCode]?.[dcCode.toLowerCase()] || "unknown";
