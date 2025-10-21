@@ -66,7 +66,26 @@ const API_URL = 'http://你的服务器IP:5000/api';
 
 ## 🔒 安全配置
 
-本项目已实现前后端API密钥验证机制，防止后端被直接调用。
+本项目实现了双层安全保护：
+
+### 1. 前端密码保护 🔐
+
+访问前端页面需要输入密码。
+
+**默认密码：** `admin123`
+
+**修改密码：** 编辑 `src/config/constants.ts` 文件
+```typescript
+// 修改此处的密码
+export const FRONTEND_PASSWORD = '你的新密码';
+
+// 开发环境可临时禁用密码保护
+export const ENABLE_FRONTEND_PASSWORD = false;
+```
+
+### 2. API密钥验证
+
+前后端通信使用API密钥验证机制，防止后端被直接调用。
 
 ### 生产环境部署前必须修改密钥
 

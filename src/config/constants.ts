@@ -75,6 +75,20 @@ export const API_URL = 'http://localhost:5000/api';
 export const API_SECRET_KEY = 'ovh-phantom-sniper-2024-secret-key';
 
 /**
+ * 前端访问密码
+ * 用于保护前端页面访问
+ * 默认密码：admin123
+ * 生产环境请修改此密码！
+ */
+export const FRONTEND_PASSWORD = 'admin123';
+
+/**
+ * 是否启用前端密码保护
+ * 开发环境可以设置为 false，生产环境建议设置为 true
+ */
+export const ENABLE_FRONTEND_PASSWORD = true;
+
+/**
  * API请求重试次数
  */
 export const API_RETRY_COUNT = 1;
