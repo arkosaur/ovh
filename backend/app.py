@@ -243,6 +243,8 @@ def check_server_availability(plan_code):
         return None
     
     try:
+        # 对于带数据中心后缀的planCode（如24rise012-mum），OVH API可能不认识
+        # 直接使用完整的planCode查询，让OVH API返回实际数据
         availabilities = client.get('/dedicated/server/datacenter/availabilities', planCode=plan_code)
         result = {}
         

@@ -578,17 +578,26 @@ const ServersPage = () => {
     setIsCheckingAvailability(true);
     setSelectedServer(planCode);
     try {
-      // 去掉数据中心后缀，只保留基础planCode
-      // 例如：24rise012-mum -> 24rise012
-      const basePlanCode = planCode.replace(/-(sgp|syd|mum|yum)$/i, '');
+      // 直接使用完整的planCode查询（包括数据中心后缀）
+      // 后端API会处理这些特殊型号
+      const response = await axios.get(`${API_URL}/availability/${planCode}`);
+      console.log(`获取到 ${planCode} 的可用性数据:`, response.data);
       
-      const response = await axios.get(`${API_URL}/availability/${basePlanCode}`);
-      console.log(`获取到 ${basePlanCode} 的可用性数据:`, response.data);
+      // OVH API返回的数据中心代码可能与前端不一致，需要映射
+      // 例如：API返回 "ynm" (孟买)，但前端使用 "mum"
+      const normalizedData: Record<string, string> = {};
+      Object.entries(response.data).forEach(([dc, status]) => {
+        // 将ynm映射为mum（孟买的API代码是ynm，前端使用mum）
+        const normalizedDc = dc === 'ynm' ? 'mum' : dc;
+        normalizedData[normalizedDc] = status as string;
+      });
+      
+      console.log(`标准化后的可用性数据:`, normalizedData);
       
       // 使用完整的 planCode 作为键存储
       setAvailability(prev => ({
         ...prev,
-        [planCode]: response.data
+        [planCode]: normalizedData
       }));
       
       toast.success(`已更新 ${planCode} 可用性信息`);
@@ -1568,8 +1577,8 @@ const ServersPage = () => {
                             if (planCodeLower.includes('-syd')) {
                               return dc.code === 'syd';
                             }
-                            if (planCodeLower.includes('-mum') || planCodeLower.includes('-yum')) {
-                              return dc.code === 'yum'; // 孟买（前端用-mum，API用yum）
+                            if (planCodeLower.includes('-mum')) {
+                              return dc.code === 'mum'; // 孟买（前端用mum，API返回ynm）
                             }
                             
                             // 默认显示所有数据中心

@@ -15,7 +15,7 @@ export const OVH_DATACENTERS: DatacenterInfo[] = [
   { code: "vin", name: "维也纳", region: "美国", flag: "🇺🇸", countryCode: "us" }, // Note: Vint Hill is in US, not Austria. Assuming 'vin' refers to Vint Hill, Virginia.
   { code: "sgp", name: "新加坡", region: "新加坡", flag: "🇸🇬", countryCode: "sg" },
   { code: "syd", name: "悉尼", region: "澳大利亚", flag: "🇦🇺", countryCode: "au" },
-  { code: "yum", name: "孟买", region: "印度", flag: "🇮🇳", countryCode: "in" },
+  { code: "mum", name: "孟买", region: "印度", flag: "🇮🇳", countryCode: "in" },
   { code: "waw", name: "华沙", region: "波兰", flag: "🇵🇱", countryCode: "pl" },
   { code: "fra", name: "法兰克福", region: "德国", flag: "🇩🇪", countryCode: "de" },
   { code: "lon", name: "伦敦", region: "英国", flag: "🇬🇧", countryCode: "gb" }
