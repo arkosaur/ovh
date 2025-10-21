@@ -576,10 +576,16 @@ const ServersPage = () => {
     }
     
     setIsCheckingAvailability(true);
+    setSelectedServer(planCode);
     try {
-      const response = await axios.get(`${API_URL}/availability/${planCode}`);
-      console.log(`获取到 ${planCode} 的可用性数据:`, response.data);
+      // 去掉数据中心后缀，只保留基础planCode
+      // 例如：24rise012-mum -> 24rise012
+      const basePlanCode = planCode.replace(/-(sgp|syd|mum|yum)$/i, '');
       
+      const response = await axios.get(`${API_URL}/availability/${basePlanCode}`);
+      console.log(`获取到 ${basePlanCode} 的可用性数据:`, response.data);
+      
+      // 使用完整的 planCode 作为键存储
       setAvailability(prev => ({
         ...prev,
         [planCode]: response.data
@@ -591,6 +597,7 @@ const ServersPage = () => {
       toast.error(`获取 ${planCode} 可用性失败`);
     } finally {
       setIsCheckingAvailability(false);
+      setSelectedServer(null);
     }
   };
 
@@ -1561,8 +1568,8 @@ const ServersPage = () => {
                             if (planCodeLower.includes('-syd')) {
                               return dc.code === 'syd';
                             }
-                            if (planCodeLower.includes('-mum')) {
-                              return dc.code === 'mum'; // 孟买（如果存在）
+                            if (planCodeLower.includes('-mum') || planCodeLower.includes('-yum')) {
+                              return dc.code === 'yum'; // 孟买（前端用-mum，API用yum）
                             }
                             
                             // 默认显示所有数据中心
