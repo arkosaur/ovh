@@ -4,10 +4,16 @@ import { useAPI } from "@/context/APIContext";
 import axios from "axios";
 import { toast } from "sonner";
 import { XIcon, RefreshCwIcon, PlusIcon, SearchIcon, PlayIcon, PauseIcon, Trash2Icon, ArrowUpDownIcon, HeartIcon } from 'lucide-react';
+import { 
+  API_URL, 
+  TASK_RETRY_INTERVAL, 
+  MIN_RETRY_INTERVAL, 
+  MAX_RETRY_INTERVAL,
+  QUEUE_POLLING_INTERVAL,
+  validateRetryInterval,
+  formatInterval
+} from "@/config/constants";
 import { OVH_DATACENTERS, DatacenterInfo } from "@/config/ovhConstants";
-
-// Backend API URL (update this to match your backend)
-const API_URL = 'http://localhost:5000/api';
 
 interface QueueItem {
   id: string;
@@ -51,7 +57,7 @@ const QueuePage = () => {
   const [planCodeInput, setPlanCodeInput] = useState<string>("123");
   const [selectedServer, setSelectedServer] = useState<ServerPlan | null>(null);
   const [selectedDatacenters, setSelectedDatacenters] = useState<string[]>([]);
-  const [retryInterval, setRetryInterval] = useState<number>(29);
+  const [retryInterval, setRetryInterval] = useState<number>(TASK_RETRY_INTERVAL);
 
   // Fetch queue items
   const fetchQueueItems = async () => {
@@ -119,7 +125,7 @@ const QueuePage = () => {
       setShowAddForm(false);
       setPlanCodeInput("");
       setSelectedDatacenters([]);
-      setRetryInterval(30);
+      setRetryInterval(TASK_RETRY_INTERVAL);
     }
   };
 
@@ -158,7 +164,7 @@ const QueuePage = () => {
     fetchServers();
     
     // Set up polling interval
-    const interval = setInterval(fetchQueueItems, 10000);
+    const interval = setInterval(fetchQueueItems, QUEUE_POLLING_INTERVAL);
     
     return () => clearInterval(interval);
   }, [isAuthenticated]);
@@ -261,15 +267,36 @@ const QueuePage = () => {
                 />
               </div>
               <div>
-                <label htmlFor="retryInterval" className="block text-sm font-medium text-cyber-secondary mb-1">抢购失败后重试间隔 (秒)</label>
+                <label htmlFor="retryInterval" className="block text-sm font-medium text-cyber-secondary mb-1">
+                  抢购失败后重试间隔 (秒)
+                  <span className="text-xs text-cyber-muted ml-2">
+                    范围: {MIN_RETRY_INTERVAL}-{MAX_RETRY_INTERVAL}秒，推荐: {TASK_RETRY_INTERVAL}秒
+                  </span>
+                </label>
                 <input
                   type="number"
                   id="retryInterval"
                   value={retryInterval}
-                  onChange={(e) => setRetryInterval(Number(e.target.value))}
-                  min="5"
-                  className="w-full cyber-input bg-cyber-surface text-cyber-text border-cyber-border focus:ring-cyber-primary focus:border-cyber-primary"
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    if (value >= MIN_RETRY_INTERVAL && value <= MAX_RETRY_INTERVAL) {
+                      setRetryInterval(value);
+                    } else {
+                      toast.warning(`重试间隔必须在 ${MIN_RETRY_INTERVAL}-${MAX_RETRY_INTERVAL} 秒之间`);
+                    }
+                  }}
+                  min={MIN_RETRY_INTERVAL}
+                  max={MAX_RETRY_INTERVAL}
+                  className={`w-full cyber-input bg-cyber-surface text-cyber-text border-cyber-border focus:ring-cyber-primary focus:border-cyber-primary ${
+                    !validateRetryInterval(retryInterval) ? 'border-red-500' : ''
+                  }`}
+                  placeholder={`推荐: ${TASK_RETRY_INTERVAL}秒`}
                 />
+                {!validateRetryInterval(retryInterval) && (
+                  <p className="text-xs text-red-400 mt-1">
+                    ⚠️ 间隔时间过短可能导致API过载，建议设置为 {TASK_RETRY_INTERVAL} 秒或更长
+                  </p>
+                )}
               </div>
             </div>
 
