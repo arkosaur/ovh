@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useAPI } from "@/context/APIContext";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { CacheManager } from "@/components/CacheManager";
 
 const SettingsPage = () => {
   const navigate = useNavigate();
@@ -416,6 +417,11 @@ const SettingsPage = () => {
                   </ul>
                 </div>
               </div>
+            </div>
+            
+            {/* 缓存管理器 */}
+            <div className="mt-6">
+              <CacheManager />
             </div>
           </div>
         </div>

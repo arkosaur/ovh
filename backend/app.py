@@ -4,6 +4,7 @@ import json
 import logging
 import uuid
 import threading
+import shutil
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -1876,6 +1877,87 @@ def get_availability(plan_code):
 def get_stats():
     update_stats()
     return jsonify(stats)
+
+@app.route('/api/cache/info', methods=['GET'])
+def get_cache_info():
+    """获取缓存信息"""
+    cache_info = {
+        "backend": {
+            "hasCachedData": len(server_list_cache["data"]) > 0,
+            "timestamp": server_list_cache["timestamp"],
+            "cacheAge": int(time.time() - server_list_cache["timestamp"]) if server_list_cache["timestamp"] else None,
+            "cacheDuration": server_list_cache["cache_duration"],
+            "serverCount": len(server_list_cache["data"]),
+            "cacheValid": False
+        },
+        "storage": {
+            "dataDir": DATA_DIR,
+            "cacheDir": CACHE_DIR,
+            "logsDir": LOGS_DIR,
+            "files": {
+                "config": os.path.exists(CONFIG_FILE),
+                "servers": os.path.exists(SERVERS_FILE),
+                "logs": os.path.exists(LOGS_FILE),
+                "queue": os.path.exists(QUEUE_FILE),
+                "history": os.path.exists(HISTORY_FILE)
+            }
+        }
+    }
+    
+    # 检查缓存是否有效
+    if server_list_cache["timestamp"]:
+        cache_age = time.time() - server_list_cache["timestamp"]
+        cache_info["backend"]["cacheValid"] = cache_age < server_list_cache["cache_duration"]
+    
+    return jsonify(cache_info)
+
+@app.route('/api/cache/clear', methods=['POST'])
+def clear_cache():
+    """清除后端缓存"""
+    global server_list_cache, server_plans
+    
+    cache_type = request.json.get('type', 'all') if request.json else 'all'
+    cleared = []
+    
+    if cache_type in ['all', 'memory']:
+        # 清除内存缓存
+        server_list_cache["data"] = []
+        server_list_cache["timestamp"] = None
+        server_plans = []
+        cleared.append('memory')
+        add_log("INFO", "已清除内存缓存")
+    
+    if cache_type in ['all', 'files']:
+        # 清除缓存文件
+        try:
+            if os.path.exists(SERVERS_FILE):
+                os.remove(SERVERS_FILE)
+                cleared.append('servers_file')
+            
+            # 清除API调试缓存
+            cache_files = ['ovh_catalog_raw.json']
+            for cache_file in cache_files:
+                cache_path = os.path.join(CACHE_DIR, cache_file)
+                if os.path.exists(cache_path):
+                    os.remove(cache_path)
+                    cleared.append(cache_file)
+            
+            # 清除服务器详细缓存目录
+            servers_cache_dir = os.path.join(CACHE_DIR, 'servers')
+            if os.path.exists(servers_cache_dir):
+                shutil.rmtree(servers_cache_dir)
+                cleared.append('servers_cache_dir')
+            
+            add_log("INFO", f"已清除缓存文件: {', '.join(cleared)}")
+        except Exception as e:
+            add_log("ERROR", f"清除缓存文件时出错: {str(e)}")
+            return jsonify({"status": "error", "message": str(e)}), 500
+    
+    return jsonify({
+        "status": "success",
+        "cleared": cleared,
+        "message": f"已清除缓存: {', '.join(cleared)}"
+    })
 
 # 确保所有必要的文件都存在
 def ensure_files_exist():
