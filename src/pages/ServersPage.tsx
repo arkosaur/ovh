@@ -945,12 +945,17 @@ const ServersPage = () => {
 
   // 获取已订阅的服务器列表
   const loadSubscribedServers = async (): Promise<Set<string>> => {
-    if (!isAuthenticated) return new Set();
+    if (!isAuthenticated) {
+      console.log(`⚠️ 未认证，返回当前订阅状态: ${subscribedServersRef.current.size} 个`);
+      return subscribedServersRef.current; // 未认证时返回现有状态，不清空
+    }
     
     try {
       const response = await api.get('/monitor/subscriptions');
       const subscriptions = response.data;
+      console.log(`📡 从API获取订阅列表，原始数据:`, subscriptions);
       const planCodes = new Set<string>(subscriptions.map((sub: any) => sub.planCode as string));
+      console.log(`📊 解析后的订阅列表: ${planCodes.size} 个，内容:`, Array.from(planCodes));
       
       // 同时更新ref和state，并保存到localStorage
       subscribedServersRef.current = planCodes;
@@ -967,11 +972,10 @@ const ServersPage = () => {
       return planCodes; // 返回值，供调用者使用
     } catch (error) {
       console.error("❌ Error loading subscribed servers:", error);
-      // 失败时也要更新ref，确保ref和返回值一致
-      const emptySet = new Set<string>();
-      subscribedServersRef.current = emptySet;
-      setSubscribedServers(emptySet);
-      return emptySet;
+      // 失败时保留现有的订阅状态，不清空
+      // 返回当前ref中的值（可能来自localStorage缓存）
+      console.log(`⚠️ API失败，保留现有订阅状态: ${subscribedServersRef.current.size} 个`);
+      return subscribedServersRef.current;
     }
   };
 
