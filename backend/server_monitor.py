@@ -50,6 +50,9 @@ class ServerMonitor:
             existing["datacenters"] = datacenters or []
             existing["notifyAvailable"] = notify_available
             existing["notifyUnavailable"] = notify_unavailable
+            # 确保历史记录字段存在
+            if "history" not in existing:
+                existing["history"] = []
             return
         
         subscription = {
@@ -58,7 +61,8 @@ class ServerMonitor:
             "notifyAvailable": notify_available,
             "notifyUnavailable": notify_unavailable,
             "lastStatus": {},  # 记录上次状态
-            "createdAt": datetime.now().isoformat()
+            "createdAt": datetime.now().isoformat(),
+            "history": []  # 历史记录
         }
         
         self.subscriptions.append(subscription)
@@ -139,10 +143,27 @@ class ServerMonitor:
                         change_type = "unavailable"
                         self.add_log("INFO", f"{plan_code}@{dc} 从有货变无货", "monitor")
                 
-                # 发送通知
+                # 发送通知并记录历史
                 if status_changed:
                     self.add_log("INFO", f"准备发送提醒: {plan_code}@{dc} - {change_type}", "monitor")
                     self.send_availability_alert(plan_code, dc, status, change_type)
+                    
+                    # 添加到历史记录
+                    if "history" not in subscription:
+                        subscription["history"] = []
+                    
+                    history_entry = {
+                        "timestamp": datetime.now().isoformat(),
+                        "datacenter": dc,
+                        "status": status,
+                        "changeType": change_type,
+                        "oldStatus": old_status
+                    }
+                    subscription["history"].append(history_entry)
+                    
+                    # 限制历史记录数量，保留最近100条
+                    if len(subscription["history"]) > 100:
+                        subscription["history"] = subscription["history"][-100:]
             
             # 更新状态
             subscription["lastStatus"] = current_availability

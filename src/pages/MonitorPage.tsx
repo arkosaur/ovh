@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '@/utils/apiClient';
 import { toast } from 'sonner';
-import { Bell, BellOff, Plus, Trash2, Settings, Clock, RefreshCw } from 'lucide-react';
+import { Bell, BellOff, Plus, Trash2, Settings, Clock, RefreshCw, History, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAPI } from '@/context/APIContext';
 
 interface Subscription {
@@ -21,6 +21,14 @@ interface MonitorStatus {
   check_interval: number;
 }
 
+interface HistoryEntry {
+  timestamp: string;
+  datacenter: string;
+  status: string;
+  changeType: string;
+  oldStatus: string | null;
+}
+
 const MonitorPage = () => {
   const { isAuthenticated } = useAPI();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -32,6 +40,8 @@ const MonitorPage = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
+  const [historyData, setHistoryData] = useState<Record<string, HistoryEntry[]>>({});
   
   // 添加订阅表单
   const [formData, setFormData] = useState({
@@ -142,6 +152,31 @@ const MonitorPage = () => {
       toast.error(errorMsg);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // 获取订阅历史记录
+  const loadHistory = async (planCode: string) => {
+    try {
+      const response = await api.get(`/monitor/subscriptions/${planCode}/history`);
+      setHistoryData(prev => ({
+        ...prev,
+        [planCode]: response.data.history
+      }));
+    } catch (error) {
+      toast.error('加载历史记录失败');
+    }
+  };
+
+  // 切换历史记录展开/收起
+  const toggleHistory = async (planCode: string) => {
+    if (expandedHistory === planCode) {
+      setExpandedHistory(null);
+    } else {
+      setExpandedHistory(planCode);
+      if (!historyData[planCode]) {
+        await loadHistory(planCode);
+      }
     }
   };
 
@@ -354,42 +389,115 @@ const MonitorPage = () => {
             <p className="text-sm mt-2">点击"添加订阅"按钮开始监控服务器</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {subscriptions.map((sub) => (
               <motion.div
                 key={sub.planCode}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex justify-between items-start p-3 bg-cyber-grid/10 rounded border border-cyber-accent/20 hover:border-cyber-accent/40 transition-colors"
+                className="bg-cyber-grid/10 rounded border border-cyber-accent/20 hover:border-cyber-accent/40 transition-colors overflow-hidden"
               >
-                <div className="flex-1">
-                  <p className="font-medium text-cyber-accent">{sub.planCode}</p>
-                  <p className="text-xs text-cyber-muted mt-1">
-                    {sub.datacenters.length > 0 
-                      ? `监控数据中心: ${sub.datacenters.join(', ')}`
-                      : '监控所有数据中心'}
-                  </p>
-                  <div className="flex gap-2 mt-2">
-                    {sub.notifyAvailable && (
-                      <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded">
-                        有货提醒
-                      </span>
-                    )}
-                    {sub.notifyUnavailable && (
-                      <span className="text-xs px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded">
-                        无货提醒
-                      </span>
-                    )}
+                <div className="flex justify-between items-start p-3">
+                  <div className="flex-1">
+                    <p className="font-medium text-cyber-accent">{sub.planCode}</p>
+                    <p className="text-xs text-cyber-muted mt-1">
+                      {sub.datacenters.length > 0 
+                        ? `监控数据中心: ${sub.datacenters.join(', ')}`
+                        : '监控所有数据中心'}
+                    </p>
+                    <div className="flex gap-2 mt-2">
+                      {sub.notifyAvailable && (
+                        <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded">
+                          有货提醒
+                        </span>
+                      )}
+                      {sub.notifyUnavailable && (
+                        <span className="text-xs px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded">
+                          无货提醒
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => toggleHistory(sub.planCode)}
+                      className="p-2 text-cyber-accent hover:bg-cyber-accent/10 rounded transition-colors"
+                      title="查看历史记录"
+                    >
+                      {expandedHistory === sub.planCode ? <ChevronUp size={16} /> : <History size={16} />}
+                    </button>
+                    <button
+                      onClick={() => handleRemoveSubscription(sub.planCode)}
+                      className="p-2 text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                      title="删除订阅"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </div>
-                
-                <button
-                  onClick={() => handleRemoveSubscription(sub.planCode)}
-                  className="p-2 text-red-400 hover:bg-red-500/10 rounded transition-colors"
-                  title="删除订阅"
-                >
-                  <Trash2 size={16} />
-                </button>
+
+                {/* 历史记录展开区域 */}
+                {expandedHistory === sub.planCode && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="border-t border-cyber-accent/20 bg-cyber-grid/5"
+                  >
+                    <div className="p-3">
+                      <div className="flex items-center gap-2 mb-3">
+                        <History size={14} className="text-cyber-accent" />
+                        <span className="text-sm font-medium text-cyber-accent">变化历史</span>
+                      </div>
+                      
+                      {historyData[sub.planCode]?.length > 0 ? (
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {historyData[sub.planCode].map((entry, index) => (
+                            <div
+                              key={index}
+                              className="flex items-start gap-3 p-2 bg-cyber-grid/10 rounded text-xs"
+                            >
+                              <div className="flex-shrink-0 mt-1">
+                                {entry.changeType === 'available' ? (
+                                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                ) : (
+                                  <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-medium text-cyber-accent">{entry.datacenter.toUpperCase()}</span>
+                                  <span className={`px-1.5 py-0.5 rounded ${
+                                    entry.changeType === 'available' 
+                                      ? 'bg-green-500/20 text-green-400' 
+                                      : 'bg-red-500/20 text-red-400'
+                                  }`}>
+                                    {entry.changeType === 'available' ? '有货' : '无货'}
+                                  </span>
+                                </div>
+                                <p className="text-cyber-muted mt-1">
+                                  {new Date(entry.timestamp).toLocaleString('zh-CN', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit'
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-cyber-muted text-center py-4">
+                          暂无历史记录
+                        </p>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
               </motion.div>
             ))}
           </div>

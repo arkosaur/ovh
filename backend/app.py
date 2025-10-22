@@ -1931,6 +1931,24 @@ def clear_subscriptions():
     add_log("INFO", f"清空所有订阅 ({count} 项)")
     return jsonify({"status": "success", "count": count, "message": f"已清空 {count} 个订阅"})
 
+@app.route('/api/monitor/subscriptions/<plan_code>/history', methods=['GET'])
+def get_subscription_history(plan_code):
+    """获取订阅的历史记录"""
+    subscription = next((s for s in monitor.subscriptions if s["planCode"] == plan_code), None)
+    
+    if not subscription:
+        return jsonify({"status": "error", "message": "订阅不存在"}), 404
+    
+    history = subscription.get("history", [])
+    # 返回倒序（最新的在前），使用切片避免修改原数组
+    reversed_history = history[::-1]
+    
+    return jsonify({
+        "status": "success",
+        "planCode": plan_code,
+        "history": reversed_history
+    })
+
 @app.route('/api/monitor/start', methods=['POST'])
 def start_monitor():
     """启动监控"""
