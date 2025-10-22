@@ -14,7 +14,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Cpu, Database, Wifi, HardDrive, CheckSquare, Square, Settings, ArrowRightLeft, Clock, Bell } from "lucide-react";
+import { Cpu, Database, Wifi, HardDrive, CheckSquare, Square, Settings, ArrowRightLeft, Clock, Bell, Grid, List, Maximize2, Minimize2 } from "lucide-react";
 import { apiEvents } from "@/context/APIContext";
 import { OVH_DATACENTERS, DatacenterInfo } from "@/config/ovhConstants"; // Import from new location
 import { API_URL } from "@/config/constants";
@@ -101,6 +101,10 @@ const ServersPage = () => {
   const hasLoadedFromCache = useRef(false);
   // 新增：标记是否真正在从API获取数据，防止并发
   const [isActuallyFetching, setIsActuallyFetching] = useState(false);
+  // 视图模式：grid 或 list
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  // 显示模式：compact 或 detailed
+  const [displayMode, setDisplayMode] = useState<'compact' | 'detailed'>('detailed');
 
   // 检查缓存是否过期
   const isCacheExpired = (): boolean => {
@@ -1450,6 +1454,41 @@ const ServersPage = () => {
               </span>
             </div>
             
+            {/* 视图切换按钮组 */}
+            <div className="flex items-center gap-2 border border-cyber-accent/30 rounded-md p-1">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded transition-all ${
+                  viewMode === 'grid' 
+                    ? 'bg-cyber-accent/20 text-cyber-accent' 
+                    : 'text-cyber-muted hover:text-cyber-text hover:bg-cyber-grid/10'
+                }`}
+                title="网格视图"
+              >
+                <Grid size={16} />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded transition-all ${
+                  viewMode === 'list' 
+                    ? 'bg-cyber-accent/20 text-cyber-accent' 
+                    : 'text-cyber-muted hover:text-cyber-text hover:bg-cyber-grid/10'
+                }`}
+                title="列表视图"
+              >
+                <List size={16} />
+              </button>
+            </div>
+
+            {/* 紧凑模式切换 */}
+            <button
+              onClick={() => setDisplayMode(displayMode === 'compact' ? 'detailed' : 'compact')}
+              className="p-2 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded-md transition-all"
+              title={displayMode === 'compact' ? '切换到详细模式' : '切换到紧凑模式'}
+            >
+              {displayMode === 'compact' ? <Maximize2 size={16} /> : <Minimize2 size={16} />}
+            </button>
+            
             <button
               onClick={() => fetchServers(true)}
               disabled={isLoading}
@@ -1506,13 +1545,20 @@ const ServersPage = () => {
           </CardContent>
         </Card>
       ) : (
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
-        >
-          {filteredServers.map((server) => (
+        <>
+        {/* 网格视图 */}
+        {viewMode === 'grid' && (
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className={`grid gap-6 ${
+              displayMode === 'compact'
+                ? 'grid-cols-1 md:grid-cols-3 xl:grid-cols-4'
+                : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
+            }`}
+          >
+            {filteredServers.map((server) => (
             <motion.div 
               key={server.planCode}
               variants={itemVariants}
@@ -1762,6 +1808,169 @@ const ServersPage = () => {
             </motion.div>
           ))}
         </motion.div>
+        )}
+        
+        {/* 列表视图 */}
+        {viewMode === 'list' && (
+          <div className="space-y-3">
+            {filteredServers.map((server) => (
+              <motion.div
+                key={server.planCode}
+                variants={itemVariants}
+                initial="hidden"
+                animate="visible"
+                className="bg-cyber-grid/10 border border-cyber-accent/30 rounded-md overflow-hidden hover:border-cyber-accent/50 transition-colors"
+              >
+                <div className={`flex items-center gap-4 ${displayMode === 'compact' ? 'p-3' : 'p-4'}`}>
+                  {/* 服务器型号 */}
+                  <div className="flex-shrink-0 w-32">
+                    <div className="font-bold text-cyber-accent">{server.planCode}</div>
+                    <div className="text-xs text-cyber-muted mt-0.5">{server.name}</div>
+                  </div>
+
+                  {/* 服务器规格 */}
+                  <div className={`flex-1 grid gap-3 ${displayMode === 'compact' ? 'grid-cols-4' : 'grid-cols-4 lg:grid-cols-5'}`}>
+                    <div className="flex items-center gap-2">
+                      <Cpu size={14} className="text-cyber-accent flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-[10px] text-cyber-muted">CPU</div>
+                        <div className="text-xs font-medium truncate">{formatServerSpec(server.cpu, "CPU")}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Database size={14} className="text-cyber-accent flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-[10px] text-cyber-muted">内存</div>
+                        <div className="text-xs font-medium truncate">{formatServerSpec(server.memory, "内存")}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <HardDrive size={14} className="text-cyber-accent flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-[10px] text-cyber-muted">存储</div>
+                        <div className="text-xs font-medium truncate">{formatServerSpec(server.storage, "存储")}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Wifi size={14} className="text-cyber-accent flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-[10px] text-cyber-muted">带宽</div>
+                        <div className="text-xs font-medium truncate">{formatServerSpec(server.bandwidth, "带宽")}</div>
+                      </div>
+                    </div>
+                    {displayMode === 'detailed' && server.vrackBandwidth && server.vrackBandwidth !== "N/A" && (
+                      <div className="flex items-center gap-2">
+                        <ArrowRightLeft size={14} className="text-cyber-accent flex-shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-[10px] text-cyber-muted">内网</div>
+                          <div className="text-xs font-medium truncate">{formatServerSpec(server.vrackBandwidth, "内网带宽")}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 操作按钮 */}
+                  <div className="flex-shrink-0 flex gap-2">
+                    <button
+                      onClick={() => checkAvailability(server.planCode)}
+                      disabled={isCheckingAvailability || !isAuthenticated}
+                      className="px-3 py-1.5 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 rounded text-xs disabled:opacity-50"
+                      title="检查可用性"
+                    >
+                      检查
+                    </button>
+                    <button
+                      onClick={() => {
+                        const selectedDcs = getSelectedDatacentersList(server.planCode);
+                        addToMonitor(server, selectedDcs);
+                      }}
+                      disabled={!isAuthenticated}
+                      className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/40 rounded text-xs disabled:opacity-50"
+                      title="添加到监控"
+                    >
+                      <Bell size={14} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        const selectedDcs = getSelectedDatacentersList(server.planCode);
+                        if (selectedDcs.length > 0) {
+                          addToQueue(server, selectedDcs);
+                        } else {
+                          toast.error("请至少选择一个数据中心");
+                        }
+                      }}
+                      disabled={!isAuthenticated || getSelectedDatacentersList(server.planCode).length === 0}
+                      className="px-4 py-1.5 bg-gradient-to-r from-cyber-primary to-cyber-primary-dark text-white rounded text-xs font-bold disabled:opacity-50"
+                      title="一键抢购"
+                    >
+                      抢购
+                    </button>
+                  </div>
+                </div>
+
+                {/* 数据中心选择（紧凑模式下隐藏） */}
+                {displayMode === 'detailed' && (
+                  <div className="border-t border-cyber-accent/20 p-3 bg-cyber-grid/5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-cyber-muted">数据中心选择：</span>
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => toggleAllDatacenters(server.planCode, true)}
+                          className="px-2 py-0.5 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 rounded text-[10px]"
+                        >
+                          全选
+                        </button>
+                        <button
+                          onClick={() => toggleAllDatacenters(server.planCode, false)}
+                          className="px-2 py-0.5 bg-cyber-grid/10 hover:bg-cyber-grid/20 text-cyber-muted border border-cyber-accent/20 rounded text-[10px]"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      {OVH_DATACENTERS
+                        .filter(dc => {
+                          const planCodeLower = server.planCode.toLowerCase();
+                          if (planCodeLower.includes('-sgp')) return dc.code === 'sgp';
+                          if (planCodeLower.includes('-syd')) return dc.code === 'syd';
+                          if (planCodeLower.includes('-mum')) return dc.code === 'mum';
+                          return true;
+                        })
+                        .map(dc => {
+                          const dcCode = dc.code.toUpperCase();
+                          const availStatus = availability[server.planCode]?.[dcCode.toLowerCase()] || "unknown";
+                          const isSelected = selectedDatacenters[server.planCode]?.[dcCode];
+                          
+                          return (
+                            <div
+                              key={dcCode}
+                              onClick={() => toggleDatacenterSelection(server.planCode, dcCode)}
+                              className={`px-2 py-1 rounded cursor-pointer text-xs flex items-center justify-between ${
+                                isSelected
+                                  ? 'bg-cyber-accent/20 border-cyber-accent text-cyber-accent'
+                                  : 'bg-slate-800/60 border-slate-700 hover:bg-slate-700/60 text-slate-300'
+                              } border`}
+                            >
+                              <span className="font-medium">{dcCode}</span>
+                              {availStatus !== "unknown" && (
+                                <span className={`text-[10px] ${
+                                  availStatus === "unavailable" ? 'text-red-500' : 'text-green-400'
+                                }`}>
+                                  {availStatus === "unavailable" ? '无' : '有'}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+        )}
+        </>
       )}
     </div>
   );
