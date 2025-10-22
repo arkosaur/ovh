@@ -14,7 +14,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Cpu, Database, Wifi, HardDrive, CheckSquare, Square, Settings, ArrowRightLeft, Clock } from "lucide-react";
+import { Cpu, Database, Wifi, HardDrive, CheckSquare, Square, Settings, ArrowRightLeft, Clock, Bell } from "lucide-react";
 import { apiEvents } from "@/context/APIContext";
 import { OVH_DATACENTERS, DatacenterInfo } from "@/config/ovhConstants"; // Import from new location
 import { API_URL } from "@/config/constants";
@@ -867,6 +867,33 @@ const ServersPage = () => {
     }
   };
 
+  // 添加到服务器监控
+  const addToMonitor = async (server: ServerPlan, datacenters: string[]) => {
+    if (!isAuthenticated) {
+      toast.error("请先配置 API 设置");
+      return;
+    }
+
+    try {
+      await api.post('/monitor/subscriptions', {
+        planCode: server.planCode,
+        datacenters: datacenters,
+        notifyAvailable: true,
+        notifyUnavailable: false
+      });
+      
+      const dcText = datacenters.length > 0 
+        ? `监控数据中心: ${datacenters.join(', ')}` 
+        : '监控所有数据中心';
+      
+      toast.success(`已添加 ${server.planCode} 到监控\n${dcText}`);
+    } catch (error: any) {
+      console.error("Error adding to monitor:", error);
+      const errorMsg = error.response?.data?.message || "添加到监控失败";
+      toast.error(errorMsg);
+    }
+  };
+
   // Subscribe to API auth changes to reload servers when auth status changes
   useEffect(() => {
     // 首次加载时，先尝试从缓存加载
@@ -1575,6 +1602,20 @@ const ServersPage = () => {
                               检查可用性
                             </span>
                           )}
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            const selectedDcs = getSelectedDatacentersList(server.planCode);
+                            addToMonitor(server, selectedDcs);
+                          }}
+                          disabled={!isAuthenticated}
+                          variant="cyber"
+                          size="sm"
+                          className="h-6 text-[10px] px-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border-blue-500/40"
+                          title="添加到服务器监控"
+                        >
+                          <Bell size={10} className="mr-1" />
+                          监控
                         </Button>
                         <Button
                           onClick={() => {
