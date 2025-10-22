@@ -210,24 +210,24 @@ const MonitorPage = () => {
             </div>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <button
               onClick={() => {
                 loadSubscriptions();
                 loadMonitorStatus();
               }}
-              className="cyber-button text-xs flex items-center gap-1"
+              className="px-4 py-2 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 rounded-md transition-all flex items-center gap-2 text-sm font-medium shadow-sm hover:shadow-md"
             >
-              <RefreshCw size={12} />
+              <RefreshCw size={16} />
               刷新
             </button>
             <button
               onClick={toggleMonitor}
               disabled={isLoading}
-              className={`cyber-button flex items-center gap-2 ${
+              className={`px-5 py-2 rounded-md transition-all flex items-center gap-2 text-sm font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
                 monitorStatus.running 
-                  ? 'bg-red-500/20 text-red-400 border-red-500/30' 
-                  : 'bg-green-500/20 text-green-400 border-green-500/30'
+                  ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 hover:border-red-500/60' 
+                  : 'bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/40 hover:border-green-500/60'
               }`}
             >
               {monitorStatus.running ? (
@@ -266,9 +266,9 @@ const MonitorPage = () => {
           <button
             onClick={testNotification}
             disabled={isLoading}
-            className="cyber-button text-xs flex items-center gap-1 bg-blue-500/20 text-blue-400 border-blue-500/30"
+            className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/40 hover:border-blue-500/60 rounded-md transition-all flex items-center gap-1.5 text-sm font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Bell size={12} />
+            <Bell size={14} />
             测试通知
           </button>
         </div>
@@ -292,15 +292,15 @@ const MonitorPage = () => {
             {subscriptions.length > 0 && (
               <button
                 onClick={handleClearAll}
-                className="cyber-button text-xs flex items-center gap-1 bg-red-500/20 text-red-400 border-red-500/30"
+                className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 hover:border-red-500/60 rounded-md transition-all flex items-center gap-1.5 text-sm font-medium shadow-sm hover:shadow-md"
               >
-                <Trash2 size={12} />
+                <Trash2 size={14} />
                 清空全部
               </button>
             )}
             <button
               onClick={() => setShowAddForm(!showAddForm)}
-              className="cyber-button text-xs flex items-center gap-1 bg-cyber-primary hover:bg-cyber-primary-dark text-white"
+              className="px-3 py-1.5 bg-cyber-primary hover:bg-cyber-primary-dark text-white border border-cyber-primary/40 hover:border-cyber-primary rounded-md transition-all flex items-center gap-1.5 text-sm font-medium shadow-sm hover:shadow-md"
             >
               <Plus size={14} />
               添加订阅
@@ -359,14 +359,17 @@ const MonitorPage = () => {
                   <span className="text-sm">无货时提醒</span>
                 </label>
               </div>
-              <div className="flex gap-2">
-                <button type="submit" className="cyber-button bg-cyber-primary text-white flex-1">
+              <div className="flex gap-3">
+                <button 
+                  type="submit" 
+                  className="flex-1 px-4 py-2.5 bg-cyber-primary hover:bg-cyber-primary-dark text-white border border-cyber-primary/40 hover:border-cyber-primary rounded-md transition-all font-medium shadow-sm hover:shadow-md"
+                >
                   确认添加
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowAddForm(false)}
-                  className="cyber-button flex-1"
+                  className="flex-1 px-4 py-2.5 bg-cyber-grid/10 hover:bg-cyber-grid/20 text-cyber-text border border-cyber-accent/30 hover:border-cyber-accent/50 rounded-md transition-all font-medium shadow-sm hover:shadow-md"
                 >
                   取消
                 </button>
