@@ -890,14 +890,14 @@ const ServersPage = () => {
         planCode: server.planCode,
         datacenters: datacenters,
         notifyAvailable: true,
-        notifyUnavailable: false
+        notifyUnavailable: true
       });
       
       const dcText = datacenters.length > 0 
         ? `监控数据中心: ${datacenters.join(', ')}` 
         : '监控所有数据中心';
       
-      toast.success(`已添加 ${server.planCode} 到监控\n${dcText}`);
+      toast.success(`已添加 ${server.planCode} 到监控\n${dcText}\n✅ 有货提醒 + 无货提醒`);
     } catch (error: any) {
       console.error("Error adding to monitor:", error);
       const errorMsg = error.response?.data?.message || "添加到监控失败";
