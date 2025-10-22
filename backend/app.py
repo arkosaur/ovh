@@ -85,25 +85,25 @@ def load_data():
     
     if os.path.exists(CONFIG_FILE):
         try:
-            with open(CONFIG_FILE, 'r') as f:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                 config = json.load(f)
         except json.JSONDecodeError:
             print(f"警告: {CONFIG_FILE}文件格式不正确，使用默认值")
     
     if os.path.exists(LOGS_FILE):
         try:
-            with open(LOGS_FILE, 'r') as f:
+            with open(LOGS_FILE, 'r', encoding='utf-8') as f:
                 content = f.read().strip()
                 if content:  # 确保文件不是空的
                     logs = json.loads(content)
                 else:
                     print(f"警告: {LOGS_FILE}文件为空，使用空列表")
-        except json.JSONDecodeError:
-            print(f"警告: {LOGS_FILE}文件格式不正确，使用空列表")
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            print(f"警告: {LOGS_FILE}文件格式不正确或编码错误，使用空列表: {e}")
     
     if os.path.exists(QUEUE_FILE):
         try:
-            with open(QUEUE_FILE, 'r') as f:
+            with open(QUEUE_FILE, 'r', encoding='utf-8') as f:
                 content = f.read().strip()
                 if content:  # 确保文件不是空的
                     queue = json.loads(content)
@@ -114,7 +114,7 @@ def load_data():
     
     if os.path.exists(HISTORY_FILE):
         try:
-            with open(HISTORY_FILE, 'r') as f:
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
                 content = f.read().strip()
                 if content:  # 确保文件不是空的
                     purchase_history = json.loads(content)
@@ -125,7 +125,7 @@ def load_data():
     
     if os.path.exists(SERVERS_FILE):
         try:
-            with open(SERVERS_FILE, 'r') as f:
+            with open(SERVERS_FILE, 'r', encoding='utf-8') as f:
                 content = f.read().strip()
                 if content:  # 确保文件不是空的
                     server_plans = json.loads(content)
