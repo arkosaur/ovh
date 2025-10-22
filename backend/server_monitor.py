@@ -28,7 +28,7 @@ class ServerMonitor:
         self.subscriptions = []  # 订阅列表
         self.known_servers = set()  # 已知服务器集合
         self.running = False  # 运行状态
-        self.check_interval = 300  # 检查间隔（秒），默认5分钟
+        self.check_interval = 60  # 检查间隔（秒），默认60秒
         self.thread = None
         
         self.add_log("INFO", "服务器监控器初始化完成", "monitor")
@@ -100,10 +100,16 @@ class ServerMonitor:
             last_status = subscription.get("lastStatus", {})
             monitored_dcs = subscription.get("datacenters", [])
             
+            # 调试日志
+            self.add_log("INFO", f"订阅 {plan_code} - 监控数据中心: {monitored_dcs if monitored_dcs else '全部'}", "monitor")
+            self.add_log("INFO", f"订阅 {plan_code} - 当前可用性: {current_availability}", "monitor")
+            self.add_log("INFO", f"订阅 {plan_code} - 上次状态: {last_status}", "monitor")
+            
             # 检查每个数据中心的变化
             for dc, status in current_availability.items():
                 # 如果指定了数据中心列表，只监控列表中的
                 if monitored_dcs and dc not in monitored_dcs:
+                    self.add_log("INFO", f"跳过数据中心 {dc}（不在监控列表中）", "monitor")
                     continue
                 
                 old_status = last_status.get(dc)
@@ -112,20 +118,30 @@ class ServerMonitor:
                 status_changed = False
                 change_type = None
                 
-                # 从无货变有货
-                if old_status == "unavailable" and status != "unavailable":
+                # 首次检查（old_status为None）且服务器可用
+                if old_status is None and status != "unavailable":
                     if subscription.get("notifyAvailable", True):
                         status_changed = True
                         change_type = "available"
+                        self.add_log("INFO", f"首次检查发现 {plan_code}@{dc} 有货", "monitor")
+                
+                # 从无货变有货
+                elif old_status == "unavailable" and status != "unavailable":
+                    if subscription.get("notifyAvailable", True):
+                        status_changed = True
+                        change_type = "available"
+                        self.add_log("INFO", f"{plan_code}@{dc} 从无货变有货", "monitor")
                 
                 # 从有货变无货
                 elif old_status not in ["unavailable", None] and status == "unavailable":
                     if subscription.get("notifyUnavailable", False):
                         status_changed = True
                         change_type = "unavailable"
+                        self.add_log("INFO", f"{plan_code}@{dc} 从有货变无货", "monitor")
                 
                 # 发送通知
                 if status_changed:
+                    self.add_log("INFO", f"准备发送提醒: {plan_code}@{dc} - {change_type}", "monitor")
                     self.send_availability_alert(plan_code, dc, status, change_type)
             
             # 更新状态
@@ -156,11 +172,17 @@ class ServerMonitor:
                     f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                 )
             
-            self.send_notification(message)
-            self.add_log("INFO", f"发送提醒: {plan_code} @ {datacenter} - {change_type}", "monitor")
+            self.add_log("INFO", f"正在发送Telegram通知: {plan_code}@{datacenter}", "monitor")
+            result = self.send_notification(message)
+            
+            if result:
+                self.add_log("INFO", f"✅ Telegram通知发送成功: {plan_code}@{datacenter} - {change_type}", "monitor")
+            else:
+                self.add_log("WARNING", f"⚠️ Telegram通知发送失败: {plan_code}@{datacenter}", "monitor")
             
         except Exception as e:
-            self.add_log("ERROR", f"发送提醒失败: {str(e)}", "monitor")
+            self.add_log("ERROR", f"发送提醒时发生异常: {str(e)}", "monitor")
+            self.add_log("ERROR", f"错误详情: {traceback.format_exc()}", "monitor")
     
     def check_new_servers(self, current_server_list):
         """
@@ -239,10 +261,14 @@ class ServerMonitor:
                 self.add_log("ERROR", f"监控循环出错: {str(e)}", "monitor")
                 self.add_log("ERROR", f"错误详情: {traceback.format_exc()}", "monitor")
             
-            # 等待下次检查
+            # 等待下次检查（使用可中断的sleep）
             if self.running:
                 self.add_log("INFO", f"等待 {self.check_interval} 秒后进行下次检查...", "monitor")
-                time.sleep(self.check_interval)
+                # 分段sleep，每秒检查一次running状态，实现快速停止
+                for _ in range(self.check_interval):
+                    if not self.running:
+                        break
+                    time.sleep(1)
         
         self.add_log("INFO", "监控循环已停止", "monitor")
     
@@ -268,9 +294,9 @@ class ServerMonitor:
         self.running = False
         self.add_log("INFO", "正在停止服务器监控...", "monitor")
         
-        # 等待线程结束（最多等待5秒）
+        # 等待线程结束（最多等待3秒，因为已优化为1秒检查一次）
         if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=5)
+            self.thread.join(timeout=3)
         
         self.add_log("INFO", "服务器监控已停止", "monitor")
         return True

@@ -1966,6 +1966,28 @@ def set_monitor_interval():
     else:
         return jsonify({"status": "error", "message": "设置失败，间隔不能小于60秒"}), 400
 
+@app.route('/api/monitor/test-notification', methods=['POST'])
+def test_notification():
+    """测试Telegram通知"""
+    try:
+        test_message = (
+            "🔔 服务器监控测试通知\n\n"
+            f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+            "✅ Telegram通知配置正常！"
+        )
+        
+        result = send_telegram_msg(test_message)
+        
+        if result:
+            add_log("INFO", "Telegram测试通知发送成功", "monitor")
+            return jsonify({"status": "success", "message": "测试通知已发送，请检查Telegram"})
+        else:
+            add_log("WARNING", "Telegram测试通知发送失败", "monitor")
+            return jsonify({"status": "error", "message": "发送失败，请检查Telegram配置和日志"}), 500
+    except Exception as e:
+        add_log("ERROR", f"测试通知异常: {str(e)}", "monitor")
+        return jsonify({"status": "error", "message": f"发送异常: {str(e)}"}), 500
+
 @app.route('/api/servers', methods=['GET'])
 def get_servers():
     global server_plans, server_list_cache
@@ -2195,6 +2217,11 @@ if __name__ == '__main__':
     
     # Start queue processor
     start_queue_processor()
+    
+    # 自动启动服务器监控（如果有订阅）
+    if len(monitor.subscriptions) > 0:
+        monitor.start()
+        add_log("INFO", f"自动启动服务器监控（{len(monitor.subscriptions)} 个订阅）")
     
     # Add initial log
     add_log("INFO", "Server started")

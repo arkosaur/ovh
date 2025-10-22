@@ -146,6 +146,20 @@ const MonitorPage = () => {
     }
   };
 
+  // 测试Telegram通知
+  const testNotification = async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.post('/monitor/test-notification');
+      toast.success(response.data.message);
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || '测试失败';
+      toast.error(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
       loadSubscriptions();
@@ -244,15 +258,26 @@ const MonitorPage = () => {
 
       {/* 提醒说明 */}
       <div className="bg-cyber-accent/10 border border-cyber-accent/30 rounded p-4">
-        <h4 className="text-cyber-accent font-medium mb-2 flex items-center gap-2">
-          <Clock size={18} />
-          监控说明
-        </h4>
+        <div className="flex justify-between items-start mb-2">
+          <h4 className="text-cyber-accent font-medium flex items-center gap-2">
+            <Clock size={18} />
+            监控说明
+          </h4>
+          <button
+            onClick={testNotification}
+            disabled={isLoading}
+            className="cyber-button text-xs flex items-center gap-1 bg-blue-500/20 text-blue-400 border-blue-500/30"
+          >
+            <Bell size={12} />
+            测试通知
+          </button>
+        </div>
         <ul className="text-sm text-cyber-muted space-y-1">
           <li>• 监控器每 {monitorStatus.check_interval} 秒检查一次订阅的服务器可用性</li>
           <li>• 当服务器从无货变有货时，会发送 Telegram 通知</li>
           <li>• 确保已在设置页面配置 Telegram Token 和 Chat ID</li>
           <li>• 可以指定监控特定数据中心，或留空监控所有数据中心</li>
+          <li>• 点击右上角"测试通知"按钮可以立即测试 Telegram 配置</li>
         </ul>
       </div>
 
