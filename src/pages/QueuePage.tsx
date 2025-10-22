@@ -20,7 +20,7 @@ interface QueueItem {
   planCode: string;
   datacenter: string;
   options: string[];
-  status: "pending" | "running" | "completed" | "failed";
+  status: "pending" | "running" | "paused" | "completed" | "failed";
   createdAt: string;
   updatedAt: string;
   retryInterval: number;
@@ -143,14 +143,30 @@ const QueuePage = () => {
 
   // Start/stop queue item
   const toggleQueueItemStatus = async (id: string, currentStatus: string) => {
-    const newStatus = currentStatus === "running" ? "pending" : "running";
+    // 优化状态切换逻辑：
+    // running → paused (暂停运行中的任务)
+    // paused → running (恢复已暂停的任务)
+    // pending/completed/failed → running (启动其他状态的任务)
+    let newStatus: string;
+    let actionText: string;
+    
+    if (currentStatus === "running") {
+      newStatus = "paused";
+      actionText = "暂停";
+    } else if (currentStatus === "paused") {
+      newStatus = "running";
+      actionText = "恢复";
+    } else {
+      newStatus = "running";
+      actionText = "启动";
+    }
     
     try {
       await api.put(`/queue/${id}/status`, {
         status: newStatus,
       });
       
-      toast.success(`已${newStatus === "running" ? "启动" : "暂停"}队列项`);
+      toast.success(`已${actionText}队列项`);
       fetchQueueItems();
     } catch (error) {
       console.error("Error updating queue item status:", error);
@@ -355,19 +371,21 @@ const QueuePage = () => {
                     className={`text-xs px-2 py-1 rounded-full font-medium
                       ${item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
                         item.status === 'running' ? 'bg-green-500/20 text-green-400' :
+                        item.status === 'paused' ? 'bg-orange-500/20 text-orange-400' :
                         item.status === 'completed' ? 'bg-blue-500/20 text-blue-400' :
                         item.status === 'failed' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-gray-400'}
                     `}
                   >
                     {item.status === "pending" && "待命中"}
                     {item.status === "running" && "运行中"}
+                    {item.status === "paused" && "已暂停"}
                     {item.status === "completed" && "已完成"}
                     {item.status === "failed" && "失败"}
                   </span>
                   <button 
                     onClick={() => toggleQueueItemStatus(item.id, item.status)}
                     className="p-1.5 hover:bg-cyber-hover rounded text-cyber-secondary hover:text-cyber-primary transition-colors"
-                    title={item.status === 'running' ? "暂停" : "启动"}
+                    title={item.status === 'running' ? "暂停" : item.status === 'paused' ? "恢复" : "启动"}
                   >
                     {item.status === 'running' ? <PauseIcon size={16} /> : <PlayIcon size={16} />}
                   </button>
