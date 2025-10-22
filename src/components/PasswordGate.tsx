@@ -261,7 +261,7 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
           initial={{ scale: 0.9 }}
           animate={{ scale: 1 }}
           transition={{ duration: 0.5 }}
-          className="relative bg-black/80 backdrop-blur-2xl border-2 border-cyan-500/40 rounded-sm shadow-2xl shadow-cyan-500/30 p-8 overflow-hidden"
+          className="relative bg-black/80 backdrop-blur-2xl border-2 border-cyan-500/40 rounded-lg shadow-2xl shadow-cyan-500/30 px-6 py-8 overflow-hidden"
         >
           {/* 卡片内部暗色背景 */}
           <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-slate-950/90 to-slate-900/90"></div>
@@ -281,25 +281,15 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
             </div>
           </div>
           
-          {/* 左侧距离标尺 */}
-          <div className="absolute left-0 top-1/4 bottom-1/4 w-8 border-r border-cyan-500/20">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="relative h-1/5">
-                <div className="absolute right-0 top-0 w-2 h-px bg-cyan-500/30"></div>
-                <div className="absolute right-2 top-0 text-[8px] font-mono text-cyan-500/40">{(i + 1) * 20}</div>
-              </div>
-            ))}
-          </div>
-          
           {/* 右侧参数显示 */}
-          <div className="absolute right-2 top-20 space-y-2 text-[10px] font-mono text-cyan-400/50">
+          <div className="absolute right-1 top-20 space-y-1 text-[9px] font-mono text-cyan-400/40">
             <motion.div
               animate={{ opacity: [0.5, 1, 0.5] }}
               transition={{ duration: 1.5, repeat: Infinity }}
             >
-              <div>WIND: 0.0</div>
-              <div>DIST: 100m</div>
-              <div>ELEV: +2.5</div>
+              <div>W: 0.0</div>
+              <div>D: 100</div>
+              <div>E: +2.5</div>
             </motion.div>
           </div>
           
@@ -323,7 +313,7 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
             initial={{ scale: 0, rotate: -180 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-            className="relative mx-auto w-32 h-32 mb-6 mt-4"
+            className="relative mx-auto w-28 h-28 mb-5 mt-3"
           >
             {/* 外层瞄准圈 - 带刻度 */}
             <motion.div
@@ -426,18 +416,19 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <h1 className="text-3xl font-black text-center mb-2 relative">
-              <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent drop-shadow-lg">
+            {/* 主标题 */}
+            <h1 className="text-4xl font-black text-center mb-3 relative tracking-tight">
+              <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 bg-clip-text text-transparent">
                 OVH幻影狙击手
               </span>
-              {/* 发光效果 */}
+              {/* 单层发光效果 */}
               <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent blur-xl opacity-50"
+                className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent blur-xl opacity-40"
                 animate={{
-                  opacity: [0.3, 0.6, 0.3],
+                  opacity: [0.3, 0.5, 0.3],
                 }}
                 transition={{
-                  duration: 2,
+                  duration: 3,
                   repeat: Infinity,
                   ease: "easeInOut"
                 }}
@@ -446,21 +437,24 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
               </motion.div>
             </h1>
             
-            {/* 任务代号 */}
+            {/* 任务代号 - 简化版 */}
             <div className="flex items-center justify-center gap-2 mb-4">
-              <div className="h-px w-8 bg-gradient-to-r from-transparent to-cyan-500/50"></div>
-              <div className="text-xs font-mono text-cyan-400/60 tracking-wider">[ OPERATION CODE ]</div>
-              <div className="h-px w-8 bg-gradient-to-l from-transparent to-cyan-500/50"></div>
+              <div className="h-px w-10 bg-gradient-to-r from-transparent to-cyan-500/40"></div>
+              <span className="text-[10px] font-mono text-cyan-300 tracking-widest">
+                [ OPERATION CODE ]
+              </span>
+              <div className="h-px w-10 bg-gradient-to-l from-transparent to-cyan-500/40"></div>
             </div>
             
-            <div className="flex items-center justify-center gap-3 text-slate-300 text-base mb-3">
+            {/* 副标题 - 简化版 */}
+            <div className="flex items-center justify-center gap-3 mb-4">
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
               >
                 <Target className="w-5 h-5 text-cyan-400" />
               </motion.div>
-              <span className="font-bold tracking-wide text-cyan-100">
+              <span className="font-extrabold text-base tracking-wide text-slate-50 drop-shadow-lg">
                 极速抢购 · 精准命中
               </span>
               <motion.div
@@ -471,7 +465,7 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
               </motion.div>
             </div>
             
-            {/* 状态指示 */}
+            {/* 状态指示 - 简化版 */}
             <div className="flex items-center justify-center gap-4 text-xs font-mono mb-6">
               <div className="flex items-center gap-1.5 text-green-400/80">
                 <motion.div
@@ -483,7 +477,11 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
               </div>
               <div className="w-px h-3 bg-cyan-500/30"></div>
               <div className="flex items-center gap-1.5 text-cyan-400/80">
-                <div className="w-1.5 h-1.5 rounded-full bg-cyan-400"></div>
+                <motion.div
+                  className="w-1.5 h-1.5 rounded-full bg-cyan-400"
+                  animate={{ opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                />
                 <span>STANDBY</span>
               </div>
             </div>
@@ -494,17 +492,21 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
             initial={{ scaleX: 0 }}
             animate={{ scaleX: 1 }}
             transition={{ delay: 0.4 }}
-            className="h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent mb-6"
-          ></motion.div>
+            className="relative mb-6"
+          >
+            <div className="h-px bg-gradient-to-r from-transparent via-cyan-500/60 to-transparent"></div>
+            <div className="absolute inset-0 h-px bg-gradient-to-r from-transparent via-cyan-400/30 to-transparent blur-sm"></div>
+          </motion.div>
 
           {/* 密码输入表单 */}
-          <motion.form
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            onSubmit={handleSubmit}
-            className="space-y-4"
-          >
+          <div className="relative">
+            <motion.form
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              onSubmit={handleSubmit}
+              className="space-y-4"
+            >
             <motion.div
               className="relative group"
               animate={isShaking ? {
@@ -523,10 +525,10 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
                   if (error) setError('');
                 }}
                 placeholder="输入访问密钥"
-                className={`pl-10 pr-10 bg-slate-800/60 text-white placeholder:text-slate-500 h-12 transition-all ${
+                className={`pl-10 pr-10 bg-slate-900/80 backdrop-blur-sm text-white placeholder:text-slate-400 h-12 rounded-lg font-medium transition-all ${
                   error 
-                    ? 'border-red-500/50 focus:border-red-400 focus:ring-2 focus:ring-red-400/20' 
-                    : 'border-slate-700/50 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20'
+                    ? 'border-2 border-red-500/60 focus:border-red-400 focus:ring-4 focus:ring-red-400/20 shadow-lg shadow-red-500/20' 
+                    : 'border-2 border-cyan-500/30 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/30 shadow-lg shadow-cyan-500/10'
                 }`}
                 autoFocus
                 disabled={isShaking}
@@ -541,92 +543,94 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
               </button>
               
               {/* 输入框光效 */}
-              <div className={`absolute inset-0 rounded-md transition-opacity blur-sm pointer-events-none ${
+              <div className={`absolute inset-0 rounded-lg transition-opacity blur-md pointer-events-none ${
                 error
-                  ? 'bg-gradient-to-r from-red-500/0 via-red-500/20 to-red-500/0 opacity-100'
-                  : 'bg-gradient-to-r from-cyan-500/0 via-cyan-500/10 to-cyan-500/0 opacity-0 group-focus-within:opacity-100'
+                  ? 'bg-gradient-to-r from-red-500/0 via-red-500/30 to-red-500/0 opacity-100'
+                  : 'bg-gradient-to-r from-cyan-500/0 via-cyan-500/20 to-cyan-500/0 opacity-0 group-focus-within:opacity-100'
               }`}></div>
             </motion.div>
 
-            {/* 错误提示 */}
-            <AnimatePresence>
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9, y: -10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                  className="relative overflow-hidden"
-                >
-                  {/* 背景脉冲效果 */}
+            {/* 错误提示 - 固定高度容器防止按钮跳动 */}
+            <div className="h-6 flex items-center">
+              <AnimatePresence>
+                {error && (
                   <motion.div
-                    className="absolute inset-0 bg-red-500/20 rounded-lg"
-                    animate={{
-                      opacity: [0.2, 0.4, 0.2],
-                      scale: [1, 1.02, 1],
-                    }}
-                    transition={{
-                      duration: 1.5,
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                  />
-                  
-                  <div className="relative flex items-center gap-3 bg-gradient-to-r from-red-500/20 via-red-500/10 to-red-500/20 border-2 border-red-500/40 rounded-lg px-4 py-3 shadow-lg shadow-red-500/20">
-                    {/* 警告图标 */}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="relative overflow-hidden w-full"
+                  >
+                    {/* 背景脉冲效果 */}
                     <motion.div
-                      animate={{ 
-                        rotate: [0, -10, 10, -10, 10, 0],
-                        scale: [1, 1.1, 1]
+                      className="absolute inset-0 bg-red-500/20 rounded-lg"
+                      animate={{
+                        opacity: [0.2, 0.4, 0.2],
+                        scale: [1, 1.02, 1],
                       }}
-                      transition={{ 
-                        duration: 0.6, 
+                      transition={{
+                        duration: 1.5,
                         repeat: Infinity,
-                        repeatDelay: 1.5
+                        ease: "easeInOut"
                       }}
-                      className="flex-shrink-0"
-                    >
-                      <div className="relative">
-                        <AlertTriangle className="w-6 h-6 text-red-400" strokeWidth={2.5} />
-                        {/* 图标光晕 */}
-                        <motion.div
-                          className="absolute inset-0 bg-red-400 rounded-full blur-md"
-                          animate={{
-                            opacity: [0.3, 0.6, 0.3],
-                          }}
-                          transition={{
-                            duration: 1,
-                            repeat: Infinity,
-                          }}
-                        />
-                      </div>
-                    </motion.div>
-                    
-                    {/* 错误文字 */}
-                    <div className="flex-1">
-                      <motion.p
-                        initial={{ x: -5 }}
-                        animate={{ x: 0 }}
-                        className="text-red-300 font-bold text-base leading-tight"
-                      >
-                        {error}
-                      </motion.p>
-                    </div>
-                    
-                    {/* 右侧装饰 */}
-                    <motion.div
-                      animate={{ opacity: [0.5, 1, 0.5] }}
-                      transition={{ duration: 1, repeat: Infinity }}
-                      className="flex-shrink-0 w-2 h-2 bg-red-400 rounded-full"
                     />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                    
+                    <div className="relative flex items-center gap-2 bg-gradient-to-r from-red-500/20 via-red-500/10 to-red-500/20 border border-red-500/40 rounded-md px-2.5 py-1.5 shadow-lg shadow-red-500/20">
+                      {/* 警告图标 */}
+                      <motion.div
+                        animate={{ 
+                          rotate: [0, -10, 10, -10, 10, 0],
+                          scale: [1, 1.1, 1]
+                        }}
+                        transition={{ 
+                          duration: 0.6, 
+                          repeat: Infinity,
+                          repeatDelay: 1.5
+                        }}
+                        className="flex-shrink-0"
+                      >
+                        <div className="relative">
+                          <AlertTriangle className="w-4 h-4 text-red-400" strokeWidth={2.5} />
+                          {/* 图标光晕 */}
+                          <motion.div
+                            className="absolute inset-0 bg-red-400 rounded-full blur-md"
+                            animate={{
+                              opacity: [0.3, 0.6, 0.3],
+                            }}
+                            transition={{
+                              duration: 1,
+                              repeat: Infinity,
+                            }}
+                          />
+                        </div>
+                      </motion.div>
+                      
+                      {/* 错误文字 */}
+                      <div className="flex-1">
+                        <motion.p
+                          initial={{ x: -5 }}
+                          animate={{ x: 0 }}
+                          className="text-red-300 font-semibold text-xs leading-tight"
+                        >
+                          {error}
+                        </motion.p>
+                      </div>
+                      
+                      {/* 右侧装饰 */}
+                      <motion.div
+                        animate={{ opacity: [0.5, 1, 0.5] }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                        className="flex-shrink-0 w-1.5 h-1.5 bg-red-400 rounded-full"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
             <Button
               type="submit"
               disabled={isShaking}
-              className="w-full h-14 bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 hover:from-cyan-600 hover:via-blue-700 hover:to-purple-700 text-white font-black text-lg shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:shadow-xl transition-all relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-14 rounded-lg bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 hover:from-cyan-400 hover:via-blue-500 hover:to-purple-500 text-white font-black text-lg shadow-xl shadow-cyan-500/40 hover:shadow-2xl hover:shadow-cyan-500/60 transition-all duration-300 relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02]"
             >
               <motion.div
                 className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
@@ -647,6 +651,7 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
               </span>
             </Button>
           </motion.form>
+          </div>
 
           {/* 底部系统信息栏 */}
           <motion.div
@@ -675,7 +680,7 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
           className="mt-6 relative"
         >
           {/* 主状态面板 */}
-          <div className="bg-black/60 backdrop-blur-sm border border-cyan-500/30 rounded-sm px-6 py-3">
+          <div className="bg-black/70 backdrop-blur-md border border-cyan-500/30 rounded-lg px-6 py-3 shadow-lg shadow-cyan-500/10">
             <div className="flex items-center justify-between gap-6">
               {/* 系统状态 */}
               <div className="flex items-center gap-2">
