@@ -95,6 +95,9 @@ server_list_cache = {
 # 初始化监控器（需要在函数定义后才能传入函数引用）
 monitor = None
 
+# 全局删除任务ID集合（用于立即停止后台线程处理）
+deleted_task_ids = set()
+
 # Load data from files if they exist
 def load_data():
     global config, logs, queue, purchase_history, server_plans, stats
@@ -642,15 +645,45 @@ def purchase_server(queue_item):
 
 # Process queue items
 def process_queue():
+    global deleted_task_ids
     while True:
+        # 在循环开始时检查队列是否为空
+        if not queue:
+            time.sleep(1)
+            continue
+            
         items_to_process = list(queue) # Create a copy to iterate over
         for item in items_to_process:
+            # 优先检查：任务是否在删除集合中（前端删除时立即生效）
+            if item["id"] in deleted_task_ids:
+                add_log("INFO", f"任务 {item['id']} 已被标记为删除，跳过处理", "queue")
+                continue
+            
+            # 次要检查：在处理前检查项目是否仍在原始队列中（通过ID检查）
+            item_still_exists = any(q_item["id"] == item["id"] for q_item in queue)
+            if not item_still_exists:
+                add_log("INFO", f"任务 {item['id']} 已从队列中移除，跳过处理", "queue")
+                # 添加到删除集合，避免重复处理
+                deleted_task_ids.add(item["id"])
+                continue
+            
             if item["status"] == "running":
                 current_time = time.time()
                 last_check_time = item.get("lastCheckTime", 0)
                 
                 # 如果是首次尝试 (lastCheckTime为0) 或者到达重试间隔
                 if last_check_time == 0 or (current_time - last_check_time >= item["retryInterval"]):
+                    # 最后检查：任务是否被标记删除
+                    if item["id"] in deleted_task_ids:
+                        add_log("INFO", f"任务 {item['id']} 在执行前被标记删除", "queue")
+                        continue
+                    
+                    # 再次检查任务是否还在队列中（可能在等待期间被删除）
+                    if not any(q_item["id"] == item["id"] for q_item in queue):
+                        add_log("INFO", f"任务 {item['id']} 在处理前被移除", "queue")
+                        deleted_task_ids.add(item["id"])
+                        continue
+                    
                     if last_check_time == 0:
                         add_log("INFO", f"首次尝试任务 {item['id']}: {item['planCode']} 在 {item['datacenter']}", "queue")
                     else:
@@ -1842,22 +1875,46 @@ def add_queue_item():
 
 @app.route('/api/queue/<id>', methods=['DELETE'])
 def remove_queue_item(id):
-    global queue
+    global queue, deleted_task_ids
     item = next((item for item in queue if item["id"] == id), None)
     if item:
+        # 立即标记为删除（后台线程会检查这个集合）
+        deleted_task_ids.add(id)
+        add_log("INFO", f"标记任务 {id} 为删除，后台线程将立即停止处理", "system")
+        
+        # 从队列中移除
         queue = [item for item in queue if item["id"] != id]
         save_data()
         update_stats()
-        add_log("INFO", f"Removed {item['planCode']} from queue")
+        add_log("INFO", f"Removed {item['planCode']} from queue (ID: {id})", "system")
     
     return jsonify({"status": "success"})
 
 @app.route('/api/queue/clear', methods=['DELETE'])
 def clear_all_queue():
-    global queue
+    global queue, deleted_task_ids
     count = len(queue)
-    queue = []
+    
+    # 立即标记所有任务为删除（后台线程会检查这个集合）
+    for item in queue:
+        deleted_task_ids.add(item["id"])
+    
+    add_log("INFO", f"标记 {count} 个任务为删除，后台线程将立即停止处理")
+    
+    # 强制清空队列
+    queue.clear()  # 使用clear()方法确保列表被清空
+    
+    # 立即保存到文件
     save_data()
+    
+    # 强制再次确认文件已写入
+    try:
+        with open(QUEUE_FILE, 'w') as f:
+            json.dump([], f)
+        add_log("INFO", f"强制清空队列文件: {QUEUE_FILE}")
+    except Exception as e:
+        add_log("ERROR", f"清空队列文件时出错: {str(e)}")
+    
     update_stats()
     add_log("INFO", f"Cleared all queue items ({count} items removed)")
     return jsonify({"status": "success", "count": count})

@@ -107,6 +107,8 @@ const ServersPage = () => {
   const [displayMode, setDisplayMode] = useState<'compact' | 'detailed'>('detailed');
   // 已订阅的服务器列表（planCode）
   const [subscribedServers, setSubscribedServers] = useState<Set<string>>(new Set());
+  // 使用ref存储订阅列表，确保排序时使用最新值
+  const subscribedServersRef = useRef<Set<string>>(new Set());
 
   // 检查缓存是否过期
   const isCacheExpired = (): boolean => {
@@ -147,10 +149,11 @@ const ServersPage = () => {
       setSelectedDatacenters(dcSelections);
       setServers(data);
       
-      // 立即设置filteredServers，避免等待useEffect
-      if (!searchTerm && selectedDatacenter === "all") {
-        setFilteredServers(data);
-      }
+      // 不要直接设置filteredServers，让排序useEffect处理
+      // 这样可以确保订阅服务器正确排序
+      // if (!searchTerm && selectedDatacenter === "all") {
+      //   setFilteredServers(data);
+      // }
       
       setLastUpdated(new Date(timestamp));
       setIsLoading(false);
@@ -286,14 +289,14 @@ const ServersPage = () => {
       
       setSelectedDatacenters(dcSelections);
       
-      // 先设置服务器数据，让useEffect来处理过滤
+      // 先设置服务器数据，让useEffect来处理过滤和排序
       setServers(formattedServers);
       
-      // 如果没有搜索词和数据中心过滤，直接设置filteredServers
-      // 这样可以立即显示数据，避免等待useEffect执行
-      if (!searchTerm && selectedDatacenter === "all") {
-        setFilteredServers(formattedServers);
-      }
+      // 不要直接设置filteredServers，让排序useEffect统一处理
+      // 这样可以确保订阅服务器正确排序
+      // if (!searchTerm && selectedDatacenter === "all") {
+      //   setFilteredServers(formattedServers);
+      // }
       
       setIsLoading(false); // isLoading 在这里可以先置为false，因为数据已获取并设置
       // 更新最后刷新时间
@@ -905,8 +908,10 @@ const ServersPage = () => {
       
       toast.success(`已添加 ${server.planCode} 到监控\n${dcText}\n✅ 有货提醒 + 无货提醒`);
       
-      // 更新订阅列表
-      loadSubscribedServers();
+      // 立即更新本地订阅列表（同时更新ref和state）
+      const newSet = new Set([...subscribedServersRef.current, server.planCode]);
+      subscribedServersRef.current = newSet;
+      setSubscribedServers(newSet);
     } catch (error: any) {
       console.error("Error adding to monitor:", error);
       const errorMsg = error.response?.data?.message || "添加到监控失败";
@@ -915,16 +920,22 @@ const ServersPage = () => {
   };
 
   // 获取已订阅的服务器列表
-  const loadSubscribedServers = async () => {
-    if (!isAuthenticated) return;
+  const loadSubscribedServers = async (): Promise<Set<string>> => {
+    if (!isAuthenticated) return new Set();
     
     try {
       const response = await api.get('/monitor/subscriptions');
       const subscriptions = response.data;
       const planCodes = new Set<string>(subscriptions.map((sub: any) => sub.planCode as string));
+      
+      // 同时更新ref和state
+      subscribedServersRef.current = planCodes;
       setSubscribedServers(planCodes);
+      
+      return planCodes; // 返回值，供调用者使用
     } catch (error) {
       console.error("Error loading subscribed servers:", error);
+      return new Set();
     }
   };
 
@@ -932,46 +943,51 @@ const ServersPage = () => {
   useEffect(() => {
     // 首次加载时，先尝试从缓存加载
     const loadInitialData = async () => {
-      // 尝试从缓存加载
+      // 先加载订阅列表（使用ref同步更新）
+      if (isAuthenticated) {
+        const planCodes = await loadSubscribedServers();
+        console.log(`✅ 已加载订阅列表: ${planCodes.size} 个服务器（ref已同步更新）`);
+      }
+      
+      // 然后加载服务器列表（此时ref已有值，排序会使用最新数据）
       const loadedFromCache = loadFromCache();
       hasLoadedFromCache.current = loadedFromCache;
       
       if (loadedFromCache) {
-        console.log("成功从缓存加载数据");
+        console.log("✅ 成功从缓存加载数据");
         
-        // 如果缓存过期，则在后台刷新数据
+        // 如果缓存过期，则在后台刷新数据（不阻塞显示）
         if (isCacheExpired()) {
-          console.log("缓存已过期，在后台刷新数据 (通过 loadInitialData)");
-          fetchServers(true);
+          console.log("⏰ 缓存已过期，在后台刷新数据");
+          fetchServers(true); // 后台刷新，不需要await
         }
       } else {
-        // 如果缓存加载失败，则直接从API获取
-        console.log("缓存加载失败或无缓存，从API获取数据 (通过 loadInitialData)");
-        fetchServers(true);
+        // 如果缓存加载失败，则直接从API获取（阻塞等待）
+        console.log("📡 缓存加载失败或无缓存，从API获取数据");
+        await fetchServers(true); // 等待完成，确保数据加载后再继续
+        console.log("✅ API数据加载完成");
       }
     };
     
     loadInitialData();
     
-    // 加载已订阅的服务器列表
-    if (isAuthenticated) {
-      loadSubscribedServers();
-    }
-    
     // 移除自动定时刷新，改为用户手动刷新
     // 后端缓存2小时，避免频繁API调用
     
     // Subscribe to auth change events
-    const unsubscribe = apiEvents.onAuthChanged((newAuthState) => {
-      console.log("认证状态改变事件触发，新状态:", newAuthState);
-      console.log("强制刷新服务器列表，使用事件传来的认证状态...");
-      // 使用事件传来的状态，而不是等待组件状态更新
-      fetchServers(true, newAuthState); // 传入认证状态，避免使用过期的组件状态
+    const unsubscribe = apiEvents.onAuthChanged(async (newAuthState) => {
+      console.log("🔄 认证状态改变事件触发，新状态:", newAuthState);
+      console.log("🔄 强制刷新服务器列表...");
       
-      // 同时加载订阅列表
+      // 先加载订阅列表（使用ref同步更新）
       if (newAuthState) {
-        loadSubscribedServers();
+        const planCodes = await loadSubscribedServers();
+        console.log(`✅ 认证变化：已加载订阅列表: ${planCodes.size} 个服务器（ref已同步更新）`);
       }
+      
+      // 等待服务器数据加载完成
+      await fetchServers(true, newAuthState); // 传入认证状态，避免使用过期的组件状态
+      console.log("✅ 认证变化：服务器数据刷新完成");
     });
     
     return () => {
@@ -1010,17 +1026,22 @@ const ServersPage = () => {
       console.log(`   数据中心过滤: ${selectedDatacenter} (暂不实际过滤)`);
     }
     
-    // 排序：已订阅的服务器排在前面
+    // 排序：已订阅的服务器排在前面（使用ref确保使用最新值）
+    const currentSubscribed = subscribedServersRef.current;
+    console.log(`📌 开始排序 - 订阅列表ref: ${currentSubscribed.size} 个，订阅列表: [${Array.from(currentSubscribed).join(', ')}]`);
+    
     filtered.sort((a, b) => {
-      const aSubscribed = subscribedServers.has(a.planCode);
-      const bSubscribed = subscribedServers.has(b.planCode);
+      const aSubscribed = currentSubscribed.has(a.planCode);
+      const bSubscribed = currentSubscribed.has(b.planCode);
       
       if (aSubscribed && !bSubscribed) return -1;
       if (!aSubscribed && bSubscribed) return 1;
       return 0; // 保持原有顺序
     });
     
-    console.log(`✅ 过滤完成，显示 ${filtered.length} 台服务器（已订阅: ${Array.from(subscribedServers).length} 台）`);
+    // 显示排序后前3个服务器
+    const top3 = filtered.slice(0, 3).map(s => `${s.planCode}${currentSubscribed.has(s.planCode) ? '✓' : ''}`).join(', ');
+    console.log(`✅ 过滤完成，显示 ${filtered.length} 台服务器（已订阅: ${currentSubscribed.size} 台），前3个: ${top3}`);
     setFilteredServers(filtered);
   }, [searchTerm, selectedDatacenter, servers, subscribedServers]);
 

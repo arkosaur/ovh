@@ -1,0 +1,31 @@
+{
+  "subscriptions": [
+    {
+      "planCode": "24sk202",
+      "datacenters": [],
+      "notifyAvailable": true,
+      "notifyUnavailable": true,
+      "lastStatus": {
+        "bhs": "1H-low",
+        "fra": "unavailable",
+        "gra": "unavailable",
+        "lon": "unavailable",
+        "rbx": "unavailable",
+        "sbg": "unavailable",
+        "waw": "unavailable"
+      },
+      "createdAt": "2025-10-22T21:35:32.898474",
+      "history": [
+        {
+          "timestamp": "2025-10-22T21:37:36.460938",
+          "datacenter": "bhs",
+          "status": "1H-low",
+          "changeType": "available",
+          "oldStatus": null
+        }
+      ]
+    }
+  ],
+  "known_servers": [],
+  "check_interval": 60
+}
