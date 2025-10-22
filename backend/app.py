@@ -160,6 +160,10 @@ def load_data():
                     # 恢复已知服务器列表
                     if 'known_servers' in subscriptions_data:
                         monitor.known_servers = set(subscriptions_data['known_servers'])
+                    # 恢复检查间隔
+                    if 'check_interval' in subscriptions_data:
+                        monitor.check_interval = subscriptions_data['check_interval']
+                        print(f"已加载检查间隔: {monitor.check_interval}秒")
                     print(f"已加载 {len(monitor.subscriptions)} 个订阅")
                 else:
                     print(f"警告: {SUBSCRIPTIONS_FILE}文件为空")
@@ -1710,7 +1714,8 @@ def save_subscriptions():
     try:
         subscriptions_data = {
             "subscriptions": monitor.subscriptions,
-            "known_servers": list(monitor.known_servers)
+            "known_servers": list(monitor.known_servers),
+            "check_interval": monitor.check_interval
         }
         with open(SUBSCRIPTIONS_FILE, 'w', encoding='utf-8') as f:
             json.dump(subscriptions_data, f, ensure_ascii=False, indent=2)
@@ -2214,6 +2219,12 @@ if __name__ == '__main__':
     
     # Load data first (会加载订阅数据)
     load_data()
+    
+    # 确保使用新的默认值60秒（如果配置文件中没有保存check_interval）
+    if monitor.check_interval == 300:
+        print("检测到旧的检查间隔300秒，更新为60秒")
+        monitor.check_interval = 60
+        save_subscriptions()
     
     # Start queue processor
     start_queue_processor()
