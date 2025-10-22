@@ -1606,17 +1606,17 @@ const ServersPage = () => {
                 {/* Header with server code and name */}
                 <CardHeader className="px-3 py-2 bg-cyber-grid/20 border-b border-cyber-accent/20">
                   <div className="flex justify-between items-center">
+                    <CardTitle className="text-base font-semibold">{server.planCode}</CardTitle>
                     <div className="flex items-center gap-2">
-                      <CardTitle className="text-base font-semibold">{server.planCode}</CardTitle>
+                      <div className="bg-cyber-accent/10 px-1.5 py-0.5 rounded text-[10px] border border-cyber-accent/20 text-cyber-accent">
+                        {server.name}
+                      </div>
                       {subscribedServers.has(server.planCode) && (
-                        <span className="flex items-center gap-1 bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded text-[10px] border border-blue-500/40" title="已订阅监控">
-                          <Bell size={10} />
-                          已订阅
+                        <span className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-400 hover:to-blue-500 hover:-translate-y-0.5 transition-all duration-200" title="已订阅监控">
+                          <Bell size={12} />
+                          <span className="tracking-wide">已订阅</span>
                         </span>
                       )}
-                    </div>
-                    <div className="bg-cyber-accent/10 px-1.5 py-0.5 rounded text-[10px] border border-cyber-accent/20 text-cyber-accent">
-                      {server.name}
                     </div>
                   </div>
                 </CardHeader>
@@ -1874,8 +1874,8 @@ const ServersPage = () => {
                     <div className="flex items-center gap-2">
                       <div className="font-bold text-cyber-accent">{server.planCode}</div>
                       {subscribedServers.has(server.planCode) && (
-                        <span title="已订阅监控">
-                          <Bell size={12} className="text-blue-400" />
+                        <span className="relative inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 hover:-translate-y-0.5 transition-all duration-200" title="已订阅监控">
+                          <Bell size={14} className="text-white" />
                         </span>
                       )}
                     </div>
