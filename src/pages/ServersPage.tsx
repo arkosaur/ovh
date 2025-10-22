@@ -105,6 +105,8 @@ const ServersPage = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   // 显示模式：compact 或 detailed
   const [displayMode, setDisplayMode] = useState<'compact' | 'detailed'>('detailed');
+  // 已订阅的服务器列表（planCode）
+  const [subscribedServers, setSubscribedServers] = useState<Set<string>>(new Set());
 
   // 检查缓存是否过期
   const isCacheExpired = (): boolean => {
@@ -902,10 +904,27 @@ const ServersPage = () => {
         : '监控所有数据中心';
       
       toast.success(`已添加 ${server.planCode} 到监控\n${dcText}\n✅ 有货提醒 + 无货提醒`);
+      
+      // 更新订阅列表
+      loadSubscribedServers();
     } catch (error: any) {
       console.error("Error adding to monitor:", error);
       const errorMsg = error.response?.data?.message || "添加到监控失败";
       toast.error(errorMsg);
+    }
+  };
+
+  // 获取已订阅的服务器列表
+  const loadSubscribedServers = async () => {
+    if (!isAuthenticated) return;
+    
+    try {
+      const response = await api.get('/monitor/subscriptions');
+      const subscriptions = response.data;
+      const planCodes = new Set<string>(subscriptions.map((sub: any) => sub.planCode as string));
+      setSubscribedServers(planCodes);
+    } catch (error) {
+      console.error("Error loading subscribed servers:", error);
     }
   };
 
@@ -934,6 +953,11 @@ const ServersPage = () => {
     
     loadInitialData();
     
+    // 加载已订阅的服务器列表
+    if (isAuthenticated) {
+      loadSubscribedServers();
+    }
+    
     // 移除自动定时刷新，改为用户手动刷新
     // 后端缓存2小时，避免频繁API调用
     
@@ -943,6 +967,11 @@ const ServersPage = () => {
       console.log("强制刷新服务器列表，使用事件传来的认证状态...");
       // 使用事件传来的状态，而不是等待组件状态更新
       fetchServers(true, newAuthState); // 传入认证状态，避免使用过期的组件状态
+      
+      // 同时加载订阅列表
+      if (newAuthState) {
+        loadSubscribedServers();
+      }
     });
     
     return () => {
@@ -981,9 +1010,19 @@ const ServersPage = () => {
       console.log(`   数据中心过滤: ${selectedDatacenter} (暂不实际过滤)`);
     }
     
-    console.log(`✅ 过滤完成，显示 ${filtered.length} 台服务器`);
+    // 排序：已订阅的服务器排在前面
+    filtered.sort((a, b) => {
+      const aSubscribed = subscribedServers.has(a.planCode);
+      const bSubscribed = subscribedServers.has(b.planCode);
+      
+      if (aSubscribed && !bSubscribed) return -1;
+      if (!aSubscribed && bSubscribed) return 1;
+      return 0; // 保持原有顺序
+    });
+    
+    console.log(`✅ 过滤完成，显示 ${filtered.length} 台服务器（已订阅: ${Array.from(subscribedServers).length} 台）`);
     setFilteredServers(filtered);
-  }, [searchTerm, selectedDatacenter, servers]);
+  }, [searchTerm, selectedDatacenter, servers, subscribedServers]);
 
   // 初始化选项
   useEffect(() => {
@@ -1567,7 +1606,15 @@ const ServersPage = () => {
                 {/* Header with server code and name */}
                 <CardHeader className="px-3 py-2 bg-cyber-grid/20 border-b border-cyber-accent/20">
                   <div className="flex justify-between items-center">
-                    <CardTitle className="text-base font-semibold">{server.planCode}</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-base font-semibold">{server.planCode}</CardTitle>
+                      {subscribedServers.has(server.planCode) && (
+                        <span className="flex items-center gap-1 bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded text-[10px] border border-blue-500/40" title="已订阅监控">
+                          <Bell size={10} />
+                          已订阅
+                        </span>
+                      )}
+                    </div>
                     <div className="bg-cyber-accent/10 px-1.5 py-0.5 rounded text-[10px] border border-cyber-accent/20 text-cyber-accent">
                       {server.name}
                     </div>
@@ -1824,7 +1871,14 @@ const ServersPage = () => {
                 <div className={`flex items-center gap-4 ${displayMode === 'compact' ? 'p-3' : 'p-4'}`}>
                   {/* 服务器型号 */}
                   <div className="flex-shrink-0 w-32">
-                    <div className="font-bold text-cyber-accent">{server.planCode}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-bold text-cyber-accent">{server.planCode}</div>
+                      {subscribedServers.has(server.planCode) && (
+                        <span title="已订阅监控">
+                          <Bell size={12} className="text-blue-400" />
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-cyber-muted mt-0.5">{server.name}</div>
                   </div>
 
