@@ -106,9 +106,22 @@ const ServersPage = () => {
   // 显示模式：compact 或 detailed
   const [displayMode, setDisplayMode] = useState<'compact' | 'detailed'>('detailed');
   // 已订阅的服务器列表（planCode）
-  const [subscribedServers, setSubscribedServers] = useState<Set<string>>(new Set());
+  // 从localStorage初始化，避免页面加载时丢失订阅状态
+  const [subscribedServers, setSubscribedServers] = useState<Set<string>>(() => {
+    try {
+      const cached = localStorage.getItem('ovh_subscribed_servers');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        console.log(`💾 从缓存恢复订阅列表: ${parsed.length} 个`);
+        return new Set(parsed);
+      }
+    } catch (error) {
+      console.error("恢复订阅列表缓存失败:", error);
+    }
+    return new Set();
+  });
   // 使用ref存储订阅列表，确保排序时使用最新值
-  const subscribedServersRef = useRef<Set<string>>(new Set());
+  const subscribedServersRef = useRef<Set<string>>(subscribedServers);
 
   // 检查缓存是否过期
   const isCacheExpired = (): boolean => {
@@ -306,6 +319,7 @@ const ServersPage = () => {
       saveToCache(formattedServers);
       
       console.log(`✅ 服务器数据已设置: ${formattedServers.length} 台服务器`);
+      console.log(`🔍 setServers后，ref.size = ${subscribedServersRef.current.size}`);
       
       // 检查是否有服务器缺少硬件信息
       const missingInfoServers = formattedServers.filter(
@@ -908,10 +922,20 @@ const ServersPage = () => {
       
       toast.success(`已添加 ${server.planCode} 到监控\n${dcText}\n✅ 有货提醒 + 无货提醒`);
       
-      // 立即更新本地订阅列表（同时更新ref和state）
+      // 立即更新本地订阅列表（同时更新ref、state和localStorage）
       const newSet = new Set([...subscribedServersRef.current, server.planCode]);
       subscribedServersRef.current = newSet;
       setSubscribedServers(newSet);
+      
+      // 保存到localStorage
+      try {
+        localStorage.setItem('ovh_subscribed_servers', JSON.stringify(Array.from(newSet)));
+      } catch (error) {
+        console.error("保存订阅列表缓存失败:", error);
+      }
+      
+      // 触发重新排序（因为移除了subscribedServers依赖，需要手动触发）
+      setServers(prevServers => [...prevServers]);
     } catch (error: any) {
       console.error("Error adding to monitor:", error);
       const errorMsg = error.response?.data?.message || "添加到监控失败";
@@ -928,14 +952,26 @@ const ServersPage = () => {
       const subscriptions = response.data;
       const planCodes = new Set<string>(subscriptions.map((sub: any) => sub.planCode as string));
       
-      // 同时更新ref和state
+      // 同时更新ref和state，并保存到localStorage
       subscribedServersRef.current = planCodes;
       setSubscribedServers(planCodes);
       
+      // 保存到localStorage，下次加载时直接使用
+      try {
+        localStorage.setItem('ovh_subscribed_servers', JSON.stringify(Array.from(planCodes)));
+        console.log(`💾 已保存订阅列表到缓存: ${planCodes.size} 个`);
+      } catch (error) {
+        console.error("保存订阅列表缓存失败:", error);
+      }
+      
       return planCodes; // 返回值，供调用者使用
     } catch (error) {
-      console.error("Error loading subscribed servers:", error);
-      return new Set();
+      console.error("❌ Error loading subscribed servers:", error);
+      // 失败时也要更新ref，确保ref和返回值一致
+      const emptySet = new Set<string>();
+      subscribedServersRef.current = emptySet;
+      setSubscribedServers(emptySet);
+      return emptySet;
     }
   };
 
@@ -943,22 +979,30 @@ const ServersPage = () => {
   useEffect(() => {
     // 首次加载时，先尝试从缓存加载
     const loadInitialData = async () => {
+      console.log(`🚀 loadInitialData开始 - isAuthenticated: ${isAuthenticated}`);
+      
       // 先加载订阅列表（使用ref同步更新）
       if (isAuthenticated) {
         const planCodes = await loadSubscribedServers();
-        console.log(`✅ 已加载订阅列表: ${planCodes.size} 个服务器（ref已同步更新）`);
+        console.log(`✅ 已加载订阅列表: ${planCodes.size} 个服务器`);
+        console.log(`🔍 检查ref: subscribedServersRef.current.size = ${subscribedServersRef.current.size}`);
+      } else {
+        console.log(`⚠️ 未认证，跳过加载订阅列表`);
       }
       
       // 然后加载服务器列表（此时ref已有值，排序会使用最新数据）
+      console.log(`🔍 加载缓存前，ref.size = ${subscribedServersRef.current.size}`);
       const loadedFromCache = loadFromCache();
       hasLoadedFromCache.current = loadedFromCache;
       
       if (loadedFromCache) {
         console.log("✅ 成功从缓存加载数据");
+        console.log(`🔍 缓存加载后，即将排序，ref.size = ${subscribedServersRef.current.size}`);
         
         // 如果缓存过期，则在后台刷新数据（不阻塞显示）
         if (isCacheExpired()) {
           console.log("⏰ 缓存已过期，在后台刷新数据");
+          // 后台刷新时，订阅列表ref已经有值，不会造成竞态
           fetchServers(true); // 后台刷新，不需要await
         }
       } else {
@@ -997,6 +1041,8 @@ const ServersPage = () => {
 
   // Apply filters when search term or datacenter changes
   useEffect(() => {
+    console.log(`🎯 排序useEffect触发 - servers.length: ${servers.length}, ref.size: ${subscribedServersRef.current.size}`);
+    
     if (servers.length === 0) {
       console.log("⏳ 服务器列表为空，跳过过滤");
       return;
@@ -1043,7 +1089,7 @@ const ServersPage = () => {
     const top3 = filtered.slice(0, 3).map(s => `${s.planCode}${currentSubscribed.has(s.planCode) ? '✓' : ''}`).join(', ');
     console.log(`✅ 过滤完成，显示 ${filtered.length} 台服务器（已订阅: ${currentSubscribed.size} 台），前3个: ${top3}`);
     setFilteredServers(filtered);
-  }, [searchTerm, selectedDatacenter, servers, subscribedServers]);
+  }, [searchTerm, selectedDatacenter, servers]); // 移除subscribedServers依赖，因为使用ref
 
   // 初始化选项
   useEffect(() => {
