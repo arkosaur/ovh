@@ -29,15 +29,24 @@ os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(CACHE_DIR, exist_ok=True)
 os.makedirs(LOGS_DIR, exist_ok=True)
 
-# Configure logging
+# Configure logging with UTF-8 encoding to support emoji and Unicode characters
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(os.path.join(LOGS_DIR, "app.log")),
+        logging.FileHandler(os.path.join(LOGS_DIR, "app.log"), encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
+
+# Set UTF-8 encoding for StreamHandler (Windows compatibility)
+import sys
+if sys.platform == 'win32':
+    # Force UTF-8 encoding for console output on Windows
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8')
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
