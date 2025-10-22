@@ -48,3 +48,8 @@ ENV/
 .idea/
 *.swp
 *.swo
+
+# Backend data files (sensitive)
+backend/data/
+backend/cache/
+backend/logs/
