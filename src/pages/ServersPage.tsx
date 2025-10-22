@@ -39,6 +39,17 @@ const globalStyles = `
 .datacenter-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 255, 218, 0.4);
 }
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+.animate-pulse-slow {
+  animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
 `;
 
 interface ServerOption {
@@ -1439,20 +1450,18 @@ const ServersPage = () => {
               </span>
             </div>
             
-            <Button
+            <button
               onClick={() => fetchServers(true)}
-              variant="cyber"
-              size="sm"
-              className="text-xs"
               disabled={isLoading}
+              className="px-4 py-2 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded-md transition-all text-sm font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={isLoading ? 'animate-spin' : ''}>
                 <polyline points="1 4 1 10 7 10"></polyline>
                 <polyline points="23 20 23 14 17 14"></polyline>
                 <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
               </svg>
               刷新
-            </Button>
+            </button>
           </div>
         </div>
       </div>
@@ -1485,16 +1494,15 @@ const ServersPage = () => {
               <line x1="6" y1="18" x2="6.01" y2="18"></line>
             </svg>
             <p className="text-cyber-muted mb-4">没有找到匹配的服务器</p>
-            <Button 
+            <button
               onClick={() => {
                 setSearchTerm("");
                 setSelectedDatacenter("all");
               }}
-              variant="cyber"
-              size="sm"
+              className="px-4 py-2 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded-md transition-all text-sm font-medium shadow-sm hover:shadow-md"
             >
               清除筛选
-            </Button>
+            </button>
           </CardContent>
         </Card>
       ) : (
@@ -1577,47 +1585,45 @@ const ServersPage = () => {
                         </svg>
                         数据中心选择
                       </span>
-                      <div className="flex space-x-1.5">
-                        <Button
-                          onClick={() => checkAvailability(server.planCode)}
-                          disabled={isCheckingAvailability || !isAuthenticated}
-                          variant="cyber"
-                          size="sm"
-                          className="h-6 text-[10px] px-2"
-                        >
-                          {isCheckingAvailability && selectedServer === server.planCode ? (
-                            <span className="inline-flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 animate-pulse text-cyber-accent">
-                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                              </svg>
-                              查询中
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <line x1="12" y1="16" x2="12" y2="12"></line>
-                                <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                              </svg>
-                              检查可用性
-                            </span>
-                          )}
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            const selectedDcs = getSelectedDatacentersList(server.planCode);
-                            addToMonitor(server, selectedDcs);
-                          }}
-                          disabled={!isAuthenticated}
-                          variant="cyber"
-                          size="sm"
-                          className="h-6 text-[10px] px-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border-blue-500/40"
-                          title="添加到服务器监控"
-                        >
-                          <Bell size={10} className="mr-1" />
-                          监控
-                        </Button>
-                        <Button
+                      <div className="flex gap-2 items-center">
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => checkAvailability(server.planCode)}
+                            disabled={isCheckingAvailability || !isAuthenticated}
+                            className="px-2 py-1 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded-md transition-all text-[10px] font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                          >
+                            {isCheckingAvailability && selectedServer === server.planCode ? (
+                              <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-pulse">
+                                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                                </svg>
+                                查询中
+                              </>
+                            ) : (
+                              <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <circle cx="12" cy="12" r="10"></circle>
+                                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                                检查
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              const selectedDcs = getSelectedDatacentersList(server.planCode);
+                              addToMonitor(server, selectedDcs);
+                            }}
+                            disabled={!isAuthenticated}
+                            className="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/40 hover:border-blue-500/60 rounded-md transition-all text-[10px] font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                            title="添加到服务器监控"
+                          >
+                            <Bell size={10} />
+                            监控
+                          </button>
+                        </div>
+                        <button
                           onClick={() => {
                             const selectedDcs = getSelectedDatacentersList(server.planCode);
                             if (selectedDcs.length > 0) {
@@ -1627,12 +1633,20 @@ const ServersPage = () => {
                             }
                           }}
                           disabled={!isAuthenticated || getSelectedDatacentersList(server.planCode).length === 0}
-                          variant="cyber-filled"
-                          size="sm"
-                          className="h-6 text-[10px] px-2"
+                          className="relative px-5 py-2 bg-gradient-to-r from-cyber-primary to-cyber-primary-dark hover:from-cyber-primary-dark hover:to-cyber-primary text-white border-2 border-cyber-primary/40 hover:border-cyber-primary rounded-md transition-all text-xs font-bold shadow-lg hover:shadow-xl hover:shadow-cyber-primary/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center gap-1.5 animate-pulse-slow"
+                          style={{ animationDuration: '2s' }}
                         >
-                          抢购
-                        </Button>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="9" cy="21" r="1"></circle>
+                            <circle cx="20" cy="21" r="1"></circle>
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                          </svg>
+                          <span className="tracking-wide">一键抢购</span>
+                          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyber-accent opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-cyber-primary"></span>
+                          </span>
+                        </button>
                       </div>
                     </div>
                     
@@ -1645,23 +1659,19 @@ const ServersPage = () => {
                           </svg>
                           选择部署位置:
                         </span>
-                        <div className="flex space-x-1">
-                          <Button
+                        <div className="flex gap-1.5">
+                          <button
                             onClick={() => toggleAllDatacenters(server.planCode, true)}
-                            variant="cyber"
-                            size="sm"
-                            className="h-5 text-[9px] px-1.5 bg-cyber-accent/10 hover:bg-cyber-accent/20"
+                            className="px-2 py-1 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded text-[10px] font-medium transition-all shadow-sm hover:shadow-md"
                           >
                             全选
-                          </Button>
-                          <Button
+                          </button>
+                          <button
                             onClick={() => toggleAllDatacenters(server.planCode, false)}
-                            variant="cyber"
-                            size="sm"
-                            className="h-5 text-[9px] px-1.5"
+                            className="px-2 py-1 bg-cyber-grid/10 hover:bg-cyber-grid/20 text-cyber-muted hover:text-cyber-text border border-cyber-accent/20 hover:border-cyber-accent/40 rounded text-[10px] font-medium transition-all shadow-sm hover:shadow-md"
                           >
                             取消全选
-                          </Button>
+                          </button>
                         </div>
                       </div>
                     </div>
