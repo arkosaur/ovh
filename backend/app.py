@@ -16,6 +16,9 @@ import requests
 # 导入API认证中间件
 from api_auth_middleware import init_api_auth
 
+# 导入服务器监控器
+from server_monitor import ServerMonitor
+
 # Data storage directories
 DATA_DIR = "data"
 CACHE_DIR = "cache"
@@ -48,6 +51,7 @@ LOGS_FILE = os.path.join(DATA_DIR, "logs.json")
 QUEUE_FILE = os.path.join(DATA_DIR, "queue.json")
 HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
 SERVERS_FILE = os.path.join(DATA_DIR, "servers.json")
+SUBSCRIPTIONS_FILE = os.path.join(DATA_DIR, "subscriptions.json")
 
 config = {
     "appKey": "",
@@ -78,6 +82,9 @@ server_list_cache = {
     "timestamp": None,
     "cache_duration": 2 * 60 * 60  # 缓存2小时
 }
+
+# 初始化监控器（需要在函数定义后才能传入函数引用）
+monitor = None
 
 # Load data from files if they exist
 def load_data():
@@ -133,6 +140,31 @@ def load_data():
                     print(f"警告: {SERVERS_FILE}文件为空，使用空列表")
         except json.JSONDecodeError:
             print(f"警告: {SERVERS_FILE}文件格式不正确，使用空列表")
+    
+    # 加载订阅数据
+    if os.path.exists(SUBSCRIPTIONS_FILE):
+        try:
+            with open(SUBSCRIPTIONS_FILE, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if content:
+                    subscriptions_data = json.loads(content)
+                    # 恢复订阅到监控器
+                    if 'subscriptions' in subscriptions_data:
+                        for sub in subscriptions_data['subscriptions']:
+                            monitor.add_subscription(
+                                sub['planCode'],
+                                sub.get('datacenters', []),
+                                sub.get('notifyAvailable', True),
+                                sub.get('notifyUnavailable', False)
+                            )
+                    # 恢复已知服务器列表
+                    if 'known_servers' in subscriptions_data:
+                        monitor.known_servers = set(subscriptions_data['known_servers'])
+                    print(f"已加载 {len(monitor.subscriptions)} 个订阅")
+                else:
+                    print(f"警告: {SUBSCRIPTIONS_FILE}文件为空")
+        except json.JSONDecodeError:
+            print(f"警告: {SUBSCRIPTIONS_FILE}文件格式不正确")
     
     # Update stats
     update_stats()
@@ -1661,6 +1693,31 @@ def send_telegram_msg(message: str):
         add_log("ERROR", f"错误详情: {traceback.format_exc()}")
         return False
 
+# 初始化服务器监控器
+def init_monitor():
+    """初始化监控器"""
+    global monitor
+    monitor = ServerMonitor(
+        check_availability_func=check_server_availability,
+        send_notification_func=send_telegram_msg,
+        add_log_func=add_log
+    )
+    return monitor
+
+# 保存订阅数据
+def save_subscriptions():
+    """保存订阅数据到文件"""
+    try:
+        subscriptions_data = {
+            "subscriptions": monitor.subscriptions,
+            "known_servers": list(monitor.known_servers)
+        }
+        with open(SUBSCRIPTIONS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(subscriptions_data, f, ensure_ascii=False, indent=2)
+        add_log("INFO", "订阅数据已保存", "monitor")
+    except Exception as e:
+        add_log("ERROR", f"保存订阅数据失败: {str(e)}", "monitor")
+
 # Routes
 @app.route('/api/settings', methods=['GET'])
 def get_settings():
@@ -1818,6 +1875,96 @@ def clear_purchase_history():
     update_stats()
     add_log("INFO", "Purchase history cleared")
     return jsonify({"status": "success"})
+
+# 监控相关API
+@app.route('/api/monitor/subscriptions', methods=['GET'])
+def get_subscriptions():
+    """获取订阅列表"""
+    return jsonify(monitor.subscriptions)
+
+@app.route('/api/monitor/subscriptions', methods=['POST'])
+def add_subscription():
+    """添加订阅"""
+    data = request.json
+    plan_code = data.get("planCode")
+    datacenters = data.get("datacenters", [])
+    notify_available = data.get("notifyAvailable", True)
+    notify_unavailable = data.get("notifyUnavailable", False)
+    
+    if not plan_code:
+        return jsonify({"status": "error", "message": "缺少planCode参数"}), 400
+    
+    monitor.add_subscription(plan_code, datacenters, notify_available, notify_unavailable)
+    save_subscriptions()
+    
+    add_log("INFO", f"添加服务器订阅: {plan_code}")
+    return jsonify({"status": "success", "message": f"已订阅 {plan_code}"})
+
+@app.route('/api/monitor/subscriptions/<plan_code>', methods=['DELETE'])
+def remove_subscription(plan_code):
+    """删除订阅"""
+    success = monitor.remove_subscription(plan_code)
+    
+    if success:
+        save_subscriptions()
+        add_log("INFO", f"删除服务器订阅: {plan_code}")
+        return jsonify({"status": "success", "message": f"已取消订阅 {plan_code}"})
+    else:
+        return jsonify({"status": "error", "message": "订阅不存在"}), 404
+
+@app.route('/api/monitor/subscriptions/clear', methods=['DELETE'])
+def clear_subscriptions():
+    """清空所有订阅"""
+    count = monitor.clear_subscriptions()
+    save_subscriptions()
+    
+    add_log("INFO", f"清空所有订阅 ({count} 项)")
+    return jsonify({"status": "success", "count": count, "message": f"已清空 {count} 个订阅"})
+
+@app.route('/api/monitor/start', methods=['POST'])
+def start_monitor():
+    """启动监控"""
+    success = monitor.start()
+    
+    if success:
+        add_log("INFO", "用户启动服务器监控")
+        return jsonify({"status": "success", "message": "监控已启动"})
+    else:
+        return jsonify({"status": "info", "message": "监控已在运行中"})
+
+@app.route('/api/monitor/stop', methods=['POST'])
+def stop_monitor():
+    """停止监控"""
+    success = monitor.stop()
+    
+    if success:
+        add_log("INFO", "用户停止服务器监控")
+        return jsonify({"status": "success", "message": "监控已停止"})
+    else:
+        return jsonify({"status": "info", "message": "监控未运行"})
+
+@app.route('/api/monitor/status', methods=['GET'])
+def get_monitor_status():
+    """获取监控状态"""
+    status = monitor.get_status()
+    return jsonify(status)
+
+@app.route('/api/monitor/interval', methods=['PUT'])
+def set_monitor_interval():
+    """设置监控间隔"""
+    data = request.json
+    interval = data.get("interval")
+    
+    if not interval or not isinstance(interval, int):
+        return jsonify({"status": "error", "message": "无效的interval参数"}), 400
+    
+    success = monitor.set_check_interval(interval)
+    
+    if success:
+        save_subscriptions()
+        return jsonify({"status": "success", "message": f"检查间隔已设置为 {interval} 秒"})
+    else:
+        return jsonify({"status": "error", "message": "设置失败，间隔不能小于60秒"}), 400
 
 @app.route('/api/servers', methods=['GET'])
 def get_servers():
@@ -2040,7 +2187,10 @@ if __name__ == '__main__':
     # 确保所有文件都存在
     ensure_files_exist()
     
-    # Load data first
+    # 初始化监控器
+    init_monitor()
+    
+    # Load data first (会加载订阅数据)
     load_data()
     
     # Start queue processor

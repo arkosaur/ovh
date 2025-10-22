@@ -18,6 +18,7 @@ const Sidebar = ({ onToggle, isOpen }: SidebarProps) => {
     { path: "/servers", icon: "server", label: "服务器列表" },
     { path: "/availability", icon: "database", label: "实时可用性" },
     { path: "/queue", icon: "clipboard-list", label: "抢购队列" },
+    { path: "/monitor", icon: "bell", label: "服务器监控" },
     { path: "/history", icon: "clock", label: "抢购历史" },
     { path: "/logs", icon: "file-text", label: "详细日志" },
     { path: "/settings", icon: "settings", label: "API设置" },
