@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '@/utils/apiClient';
 import { toast } from 'sonner';
-import { Bell, BellOff, Plus, Trash2, Play, Square, Settings, Clock, RefreshCw } from 'lucide-react';
+import { Bell, BellOff, Plus, Trash2, Settings, Clock, RefreshCw } from 'lucide-react';
 import { useAPI } from '@/context/APIContext';
 
 interface Subscription {
@@ -131,21 +131,6 @@ const MonitorPage = () => {
     }
   };
 
-  // 启动/停止监控
-  const toggleMonitor = async () => {
-    setIsLoading(true);
-    try {
-      const endpoint = monitorStatus.running ? '/monitor/stop' : '/monitor/start';
-      const response = await api.post(endpoint);
-      toast.success(response.data.message);
-      loadMonitorStatus();
-    } catch (error) {
-      toast.error('操作失败');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // 测试Telegram通知
   const testNotification = async () => {
     setIsLoading(true);
@@ -210,33 +195,16 @@ const MonitorPage = () => {
             </div>
           </div>
           
-          <div className="flex gap-3">
-            <button
-              onClick={() => {
-                loadSubscriptions();
-                loadMonitorStatus();
-              }}
-              className="px-4 py-2 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 rounded-md transition-all flex items-center gap-2 text-sm font-medium shadow-sm hover:shadow-md"
-            >
-              <RefreshCw size={16} />
-              刷新
-            </button>
-            <button
-              onClick={toggleMonitor}
-              disabled={isLoading}
-              className={`px-5 py-2 rounded-md transition-all flex items-center gap-2 text-sm font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
-                monitorStatus.running 
-                  ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 hover:border-red-500/60' 
-                  : 'bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/40 hover:border-green-500/60'
-              }`}
-            >
-              {monitorStatus.running ? (
-                <><Square size={16} /> 停止监控</>
-              ) : (
-                <><Play size={16} /> 启动监控</>
-              )}
-            </button>
-          </div>
+          <button
+            onClick={() => {
+              loadSubscriptions();
+              loadMonitorStatus();
+            }}
+            className="px-4 py-2 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 rounded-md transition-all flex items-center gap-2 text-sm font-medium shadow-sm hover:shadow-md"
+          >
+            <RefreshCw size={16} />
+            刷新
+          </button>
         </div>
 
         {/* 统计信息 */}

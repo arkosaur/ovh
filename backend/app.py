@@ -1902,6 +1902,11 @@ def add_subscription():
     monitor.add_subscription(plan_code, datacenters, notify_available, notify_unavailable)
     save_subscriptions()
     
+    # 如果监控未运行，自动启动
+    if not monitor.running:
+        monitor.start()
+        add_log("INFO", "添加订阅后自动启动监控")
+    
     add_log("INFO", f"添加服务器订阅: {plan_code}")
     return jsonify({"status": "success", "message": f"已订阅 {plan_code}"})
 
