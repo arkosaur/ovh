@@ -174,6 +174,22 @@ const QueuePage = () => {
     }
   };
 
+  // Clear all queue items
+  const clearAllQueue = async () => {
+    if (!window.confirm('确定要清空所有队列吗？此操作不可撤销。')) {
+      return;
+    }
+    
+    try {
+      const response = await api.delete(`/queue/clear`);
+      toast.success(`已清空队列（共 ${response.data.count} 项）`);
+      fetchQueueItems();
+    } catch (error) {
+      console.error("Error clearing queue:", error);
+      toast.error("清空队列失败");
+    }
+  };
+
   // Initial fetch
   useEffect(() => {
     fetchQueueItems();
@@ -230,14 +246,26 @@ const QueuePage = () => {
 
       {/* Controls */}
       <div className="flex justify-between items-center mb-6">
-        <button
-          onClick={() => fetchQueueItems()}
-          className="cyber-button text-xs flex items-center"
-          disabled={isLoading}
-        >
-          <RefreshCwIcon size={12} className="mr-1" />
-          刷新
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => fetchQueueItems()}
+            className="cyber-button text-xs flex items-center"
+            disabled={isLoading}
+          >
+            <RefreshCwIcon size={12} className="mr-1" />
+            刷新
+          </button>
+          {queueItems.length > 0 && (
+            <button
+              onClick={clearAllQueue}
+              className="cyber-button text-xs flex items-center bg-red-500/20 hover:bg-red-500/30 text-red-400 border-red-500/30"
+              disabled={isLoading}
+            >
+              <Trash2Icon size={12} className="mr-1" />
+              清空队列
+            </button>
+          )}
+        </div>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
           className="cyber-button text-xs flex items-center bg-cyber-primary hover:bg-cyber-primary-dark text-white"

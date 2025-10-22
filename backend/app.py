@@ -1781,6 +1781,16 @@ def remove_queue_item(id):
     
     return jsonify({"status": "success"})
 
+@app.route('/api/queue/clear', methods=['DELETE'])
+def clear_all_queue():
+    global queue
+    count = len(queue)
+    queue = []
+    save_data()
+    update_stats()
+    add_log("INFO", f"Cleared all queue items ({count} items removed)")
+    return jsonify({"status": "success", "count": count})
+
 @app.route('/api/queue/<id>/status', methods=['PUT'])
 def update_queue_status(id):
     data = request.json
