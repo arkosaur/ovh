@@ -2025,10 +2025,21 @@ const ServersPage = () => {
                         }
                       }}
                       disabled={!isAuthenticated || getSelectedDatacentersList(server.planCode).length === 0}
-                      className="px-4 py-1.5 bg-gradient-to-r from-cyber-primary to-cyber-primary-dark text-white rounded text-xs font-bold disabled:opacity-50"
-                      title="一键抢购"
+                      className={`px-4 py-2 rounded text-xs font-extrabold shadow-md transition-all duration-200 tracking-wider border ${
+                        !isAuthenticated || getSelectedDatacentersList(server.planCode).length === 0
+                          ? 'bg-gradient-to-r from-slate-600 to-slate-700 text-slate-300 border-slate-500/50 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-blue-400/50 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-500/40'
+                      }`}
+                      style={{ textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}
+                      title={
+                        !isAuthenticated 
+                          ? "请先配置API设置" 
+                          : getSelectedDatacentersList(server.planCode).length === 0 
+                            ? "请先选择数据中心" 
+                            : "一键抢购"
+                      }
                     >
-                      抢购
+                      🛒 抢购
                     </button>
                   </div>
                 </div>
