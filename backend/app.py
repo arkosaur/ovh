@@ -2475,6 +2475,10 @@ def config_sniper_monitor_loop():
                 elif task['match_status'] == 'matched':
                     handle_matched_task(task)
                 
+                # 已完成任务：跳过
+                elif task['match_status'] == 'completed':
+                    continue
+                
                 # 更新最后检查时间
                 task['last_check'] = datetime.now().isoformat()
             
@@ -2536,7 +2540,13 @@ def handle_pending_match_task(task):
         add_log("DEBUG", f"待匹配任务 {task['api1_planCode']} 暂无新增", "config_sniper")
 
 def check_and_queue_plancode(api2_plancode, task, bound_config, client):
-    """检查单个 planCode 的可用性并加入队列"""
+    """检查单个 planCode 的可用性并加入队列
+    
+    Returns:
+        bool: 是否有新订单加入队列
+    """
+    queued_count = 0
+    
     try:
         availabilities = client.get(
             '/dedicated/server/datacenter/availabilities',
@@ -2624,6 +2634,7 @@ def check_and_queue_plancode(api2_plancode, task, bound_config, client):
                 queue.append(queue_item)
                 save_data()
                 update_stats()
+                queued_count += 1
                 
                 add_log("INFO", 
                     f"🚀 已添加 {api2_plancode} ({datacenter}) 到购买队列", 
@@ -2640,6 +2651,8 @@ def check_and_queue_plancode(api2_plancode, task, bound_config, client):
                 )
     except Exception as e:
         raise e
+    
+    return queued_count > 0
 
 def handle_matched_task(task):
     """处理已匹配任务 - 监控可用性 + 检测新增 planCode"""
@@ -2687,11 +2700,25 @@ def handle_matched_task(task):
         add_log("WARNING", f"检查新增 planCode 失败: {str(e)}", "config_sniper")
     
     # 遍历所有配置匹配的 API2 planCode，检查可用性并加入队列
+    has_queued = False
     for api2_plancode in matched_api2_plancodes:
         try:
-            check_and_queue_plancode(api2_plancode, task, bound_config, client)
+            if check_and_queue_plancode(api2_plancode, task, bound_config, client):
+                has_queued = True
         except Exception as e:
             add_log("WARNING", f"查询 {api2_plancode} 可用性失败: {str(e)}", "config_sniper")
+    
+    # 如果有订单加入队列，标记任务为已完成
+    if has_queued:
+        task['match_status'] = 'completed'
+        save_config_sniper_tasks()
+        add_log("INFO", f"✅ 任务完成！{task['api1_planCode']} 已加入购买队列，停止监控", "config_sniper")
+        send_telegram_msg(
+            f"✅ 配置狙击任务完成！\n"
+            f"型号: {task['api1_planCode']}\n"
+            f"配置: {format_memory_display(bound_config['memory'])} + {format_storage_display(bound_config['storage'])}\n"
+            f"已加入购买队列，任务已自动完成"
+        )
 
 def start_config_sniper_monitor():
     """启动配置绑定狙击监控线程"""
@@ -2944,6 +2971,8 @@ def check_config_sniper_task(task_id):
             handle_pending_match_task(task)
         elif task['match_status'] == 'matched':
             handle_matched_task(task)
+        elif task['match_status'] == 'completed':
+            return jsonify({"success": True, "message": "任务已完成，无需检查"})
         
         task['last_check'] = datetime.now().isoformat()
         save_config_sniper_tasks()
