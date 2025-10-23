@@ -19,6 +19,7 @@ const Sidebar = ({ onToggle, isOpen }: SidebarProps) => {
     { path: "/availability", icon: "database", label: "实时可用性" },
     { path: "/queue", icon: "clipboard-list", label: "抢购队列" },
     { path: "/monitor", icon: "bell", label: "服务器监控" },
+    { path: "/config-sniper", icon: "target", label: "配置绑定狙击" },
     { path: "/history", icon: "clock", label: "抢购历史" },
     { path: "/logs", icon: "file-text", label: "详细日志" },
     { path: "/settings", icon: "settings", label: "API设置" },
@@ -135,6 +136,13 @@ const Sidebar = ({ onToggle, isOpen }: SidebarProps) => {
                   <>
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                     <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                  </>
+                )}
+                {item.icon === "target" && (
+                  <>
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <circle cx="12" cy="12" r="6"></circle>
+                    <circle cx="12" cy="12" r="2"></circle>
                   </>
                 )}
                 {item.icon === "settings" && (

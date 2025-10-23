@@ -61,6 +61,7 @@ QUEUE_FILE = os.path.join(DATA_DIR, "queue.json")
 HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
 SERVERS_FILE = os.path.join(DATA_DIR, "servers.json")
 SUBSCRIPTIONS_FILE = os.path.join(DATA_DIR, "subscriptions.json")
+CONFIG_SNIPER_FILE = os.path.join(DATA_DIR, "config_sniper_tasks.json")
 
 config = {
     "appKey": "",
@@ -98,9 +99,13 @@ monitor = None
 # 全局删除任务ID集合（用于立即停止后台线程处理）
 deleted_task_ids = set()
 
+# 配置绑定狙击任务
+config_sniper_tasks = []
+config_sniper_running = False
+
 # Load data from files if they exist
 def load_data():
-    global config, logs, queue, purchase_history, server_plans, stats
+    global config, logs, queue, purchase_history, server_plans, stats, config_sniper_tasks
     
     if os.path.exists(CONFIG_FILE):
         try:
@@ -182,6 +187,20 @@ def load_data():
         except json.JSONDecodeError:
             print(f"警告: {SUBSCRIPTIONS_FILE}文件格式不正确")
     
+    # 加载配置绑定狙击任务
+    if os.path.exists(CONFIG_SNIPER_FILE):
+        try:
+            with open(CONFIG_SNIPER_FILE, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if content:
+                    config_sniper_tasks.clear()
+                    config_sniper_tasks.extend(json.loads(content))
+                    print(f"已加载 {len(config_sniper_tasks)} 个配置绑定狙击任务")
+                else:
+                    print(f"警告: {CONFIG_SNIPER_FILE}文件为空")
+        except json.JSONDecodeError:
+            print(f"警告: {CONFIG_SNIPER_FILE}文件格式不正确")
+    
     # Update stats
     update_stats()
     
@@ -219,6 +238,15 @@ def try_save_file(filename, data):
         print(f"成功保存 {filename}")
     except Exception as e:
         print(f"保存 {filename} 时出错: {str(e)}")
+
+# 保存配置绑定狙击任务
+def save_config_sniper_tasks():
+    try:
+        with open(CONFIG_SNIPER_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config_sniper_tasks, f, indent=2, ensure_ascii=False)
+        logging.info(f"已保存 {len(config_sniper_tasks)} 个配置绑定狙击任务")
+    except Exception as e:
+        logging.error(f"保存配置狙击任务时出错: {str(e)}")
 
 # Add a log entry
 def add_log(level, message, source="system"):
@@ -2299,6 +2327,584 @@ def ensure_files_exist():
             json.dump(config, f)
         print(f"已创建默认 {CONFIG_FILE} 文件")
 
+# ==================== 配置绑定狙击系统 ====================
+
+def standardize_config(config_str):
+    """标准化配置字符串，提取核心参数用于匹配"""
+    if not config_str:
+        return ""
+    
+    normalized = config_str.lower().strip()
+    
+    # 第一步：移除所有型号后缀
+    model_patterns = [
+        r'-\d+skl[a-e]\d{2}(-v\d+)?',  # -24sklea01, -24sklea01-v1
+        r'-\d+sk\d+',                   # -24sk502
+        r'-\d+rise\d*',                 # -24rise, -24rise012
+        r'-\d+sys\w*',                  # -24sys, -24sysgame01
+        r'-\d+risegame\d*',             # -24risegame01
+        r'-\d+risestor',                # -24risestor
+        r'-\d+skgame\d*',               # -24skgame01
+        r'-\d+ska\d*',                  # -24ska01
+        r'-\d+skstor\d*',               # -24skstor01
+        r'-\d+sysstor',                 # -24sysstor
+        r'game\d*',                     # game01, game02
+        r'stor\d*',                     # stor
+        r'-ks\d+',                      # -ks40
+        r'-rise',                       # -rise
+        r'-\d+sysle\d+',                # -25sysle012
+        r'-\d+skb\d+',                  # -25skb01
+        r'-\d+skc\d+',                  # -25skc01
+        r'-\d+sk\d+b',                  # -24sk60b
+        r'-v\d+',                       # -v1
+        r'-[a-z]{3}$',                  # -gra, -sgp (机房后缀)
+    ]
+    
+    for pattern in model_patterns:
+        normalized = re.sub(pattern, '', normalized)
+    
+    # 第二步：移除规格细节，只保留核心参数
+    # 对于内存：移除频率 (ecc-2133, noecc-2400 等)
+    normalized = re.sub(r'-(no)?ecc-\d+', '', normalized)
+    
+    # 对于存储：移除后缀修饰符
+    normalized = re.sub(r'-(sas|sa|ssd|nvme)$', '', normalized)
+    
+    # 移除其他规格细节数字 (如频率)
+    normalized = re.sub(r'-\d{4,5}$', '', normalized)  # -4800, -5600
+    
+    return normalized
+
+def find_matching_api2_plans(config_fingerprint, target_plancode_base=None):
+    """在 API2 catalog 中查找配置匹配的所有 planCode（返回列表）"""
+    client = get_ovh_client()
+    if not client:
+        return []
+    
+    try:
+        catalog = client.get(f'/order/catalog/public/eco?ovhSubsidiary={config["zone"]}')
+        matched_plancodes = []
+        
+        for plan in catalog.get("plans", []):
+            plan_code = plan.get("planCode")
+            addon_families = plan.get("addonFamilies", [])
+            
+            # 提取配置
+            memory_config = None
+            storage_config = None
+            
+            for family in addon_families:
+                family_name = family.get("name", "").lower()
+                default_addon = family.get("default")
+                
+                if family_name == "memory" and default_addon:
+                    memory_config = default_addon
+                elif family_name == "storage" and default_addon:
+                    storage_config = default_addon
+            
+            if memory_config and storage_config:
+                # 标准化并比较（配置匹配）
+                plan_fingerprint = (
+                    standardize_config(memory_config),
+                    standardize_config(storage_config)
+                )
+                
+                # 记录所有扫描到的 API2 配置（用于调试）
+                add_log("DEBUG", f"API2 扫描: {plan_code}, memory={standardize_config(memory_config)}, storage={standardize_config(storage_config)}", "config_sniper")
+                
+                if plan_fingerprint == config_fingerprint:
+                    matched_plancodes.append(plan_code)
+                    add_log("INFO", f"✓ API2 配置匹配: {plan_code}", "config_sniper")
+        
+        add_log("INFO", f"配置匹配完成，找到 {len(matched_plancodes)} 个 API2 planCode", "config_sniper")
+        return matched_plancodes
+        
+    except Exception as e:
+        add_log("ERROR", f"查找匹配 API2 planCode 时出错: {str(e)}")
+        return []
+
+def format_memory_display(memory_code):
+    """格式化内存显示"""
+    match = re.search(r'(\d+)g', memory_code, re.I)
+    if match:
+        return f"{match.group(1)}GB RAM"
+    return memory_code
+
+def format_storage_display(storage_code):
+    """格式化存储显示"""
+    match = re.search(r'(\d+)x(\d+)(ssd|nvme|hdd)', storage_code, re.I)
+    if match:
+        count = match.group(1)
+        size = match.group(2)
+        type_str = match.group(3).upper()
+        return f"{count}x {size}GB {type_str}"
+    return storage_code
+
+# 配置绑定狙击监控线程
+def config_sniper_monitor_loop():
+    """配置绑定狙击监控主循环（60秒轮询）"""
+    global config_sniper_running
+    config_sniper_running = True
+    
+    add_log("INFO", "配置绑定狙击监控已启动（60秒轮询）", "config_sniper")
+    
+    while config_sniper_running:
+        try:
+            for task in config_sniper_tasks:
+                if not task.get('enabled'):
+                    continue
+                
+                # 待匹配任务：先尝试匹配 API2
+                if task['match_status'] == 'pending_match':
+                    handle_pending_match_task(task)
+                
+                # 已匹配任务：检查可用性并下单
+                elif task['match_status'] == 'matched':
+                    handle_matched_task(task)
+                
+                # 更新最后检查时间
+                task['last_check'] = datetime.now().isoformat()
+            
+            save_config_sniper_tasks()
+            time.sleep(60)  # 60秒轮询
+            
+        except Exception as e:
+            add_log("ERROR", f"配置狙击监控循环错误: {str(e)}", "config_sniper")
+            time.sleep(60)
+
+def handle_pending_match_task(task):
+    """处理待匹配任务 - 增量匹配新增的 planCode"""
+    config = task['bound_config']
+    memory_std = standardize_config(config['memory'])
+    storage_std = standardize_config(config['storage'])
+    config_fingerprint = (memory_std, storage_std)
+    
+    # 查询当前所有配置匹配的 planCode
+    current_matched = find_matching_api2_plans(config_fingerprint, task['api1_planCode'])
+    
+    # 获取已记录的 planCode（避免重复）
+    existing_matched = task.get('matched_api2', [])
+    
+    # 找出新增的 planCode（增量匹配）
+    new_plancodes = [pc for pc in current_matched if pc not in existing_matched]
+    
+    if new_plancodes:
+        # 发现新增的 planCode！
+        task['matched_api2'] = existing_matched + new_plancodes  # 累加
+        
+        add_log("INFO", 
+            f"✅ 发现新增 planCode！{task['api1_planCode']} 新增 {len(new_plancodes)} 个：{', '.join(new_plancodes)}", 
+            "config_sniper")
+        
+        # 发送 Telegram 通知
+        send_telegram_msg(
+            f"✅ 发现新增配置！\n"
+            f"型号: {task['api1_planCode']}\n"
+            f"配置: {format_memory_display(config['memory'])} + {format_storage_display(config['storage'])}\n"
+            f"新增 planCode: {', '.join(new_plancodes)}\n"
+            f"总计: {len(task['matched_api2'])} 个"
+        )
+        
+        # 如果是第一次匹配成功，转为已匹配状态
+        if task['match_status'] == 'pending_match':
+            task['match_status'] = 'matched'
+        
+        save_config_sniper_tasks()
+        
+        # 立即检查新增 planCode 的可用性并加入队列
+        client = get_ovh_client()
+        if client:
+            for new_plancode in new_plancodes:
+                try:
+                    check_and_queue_plancode(new_plancode, task, config, client)
+                except Exception as e:
+                    add_log("WARNING", f"检查新增 {new_plancode} 可用性失败: {str(e)}", "config_sniper")
+    else:
+        add_log("DEBUG", f"待匹配任务 {task['api1_planCode']} 暂无新增", "config_sniper")
+
+def check_and_queue_plancode(api2_plancode, task, bound_config, client):
+    """检查单个 planCode 的可用性并加入队列"""
+    try:
+        availabilities = client.get(
+            '/dedicated/server/datacenter/availabilities',
+            planCode=api2_plancode
+        )
+        
+        for item in availabilities:
+            for dc in item.get("datacenters", []):
+                availability = dc.get("availability")
+                datacenter = dc.get("datacenter")
+                
+                # 接受所有非 unavailable 状态
+                if availability in ["unavailable", "unknown"]:
+                    continue
+                
+                add_log("INFO", 
+                    f"🎯 发现可用！API2={api2_plancode} 机房={datacenter} 状态={availability}", 
+                    "config_sniper")
+                
+                # 检查是否已在队列中
+                existing_queue_item = next((q for q in queue 
+                    if q['planCode'] == api2_plancode 
+                    and q.get('configSniperTaskId') == task['id']), None)
+                
+                if existing_queue_item:
+                    add_log("DEBUG", f"{api2_plancode} 已在队列中，跳过", "config_sniper")
+                    continue
+                
+                # 添加到购买队列（用 API2 planCode 下单）
+                current_time = datetime.now().isoformat()
+                queue_item = {
+                    "id": str(uuid.uuid4()),
+                    "planCode": api2_plancode,
+                    "datacenter": datacenter,
+                    "options": [],
+                    "status": "running",
+                    "retryCount": 0,
+                    "maxRetries": 3,
+                    "retryInterval": 30,
+                    "createdAt": current_time,
+                    "updatedAt": current_time,
+                    "lastCheckTime": 0,
+                    "configSniperTaskId": task['id']
+                }
+                
+                queue.append(queue_item)
+                save_data()
+                update_stats()
+                
+                add_log("INFO", 
+                    f"🚀 已添加 {api2_plancode} ({datacenter}) 到购买队列", 
+                    "config_sniper")
+                
+                # 发送 Telegram 通知
+                send_telegram_msg(
+                    f"🎯 配置狙击触发！\n"
+                    f"源型号: {task['api1_planCode']}\n"
+                    f"绑定配置: {format_memory_display(bound_config['memory'])} + {format_storage_display(bound_config['storage'])}\n"
+                    f"下单代号: {api2_plancode}\n"
+                    f"机房: {datacenter} ({availability})\n"
+                    f"已加入购买队列..."
+                )
+    except Exception as e:
+        raise e
+
+def handle_matched_task(task):
+    """处理已匹配任务 - 监控可用性 + 检测新增 planCode"""
+    bound_config = task['bound_config']
+    matched_api2_plancodes = task['matched_api2']  # API2 planCode 列表（配置已匹配）
+    
+    client = get_ovh_client()
+    if not client:
+        return
+    
+    # 定期检查是否有新增的 planCode（每次监控时都检查）
+    try:
+        memory_std = standardize_config(bound_config['memory'])
+        storage_std = standardize_config(bound_config['storage'])
+        config_fingerprint = (memory_std, storage_std)
+        
+        current_matched = find_matching_api2_plans(config_fingerprint, task['api1_planCode'])
+        new_plancodes = [pc for pc in current_matched if pc not in matched_api2_plancodes]
+        
+        if new_plancodes:
+            # 发现新增！
+            task['matched_api2'] = matched_api2_plancodes + new_plancodes
+            matched_api2_plancodes = task['matched_api2']  # 更新本地变量
+            
+            add_log("INFO", 
+                f"🆕 已匹配任务发现新增！{task['api1_planCode']} 新增 {len(new_plancodes)} 个：{', '.join(new_plancodes)}", 
+                "config_sniper")
+            
+            send_telegram_msg(
+                f"🆕 监控中发现新增！\n"
+                f"型号: {task['api1_planCode']}\n"
+                f"新增: {', '.join(new_plancodes)}\n"
+                f"总计: {len(task['matched_api2'])} 个 planCode"
+            )
+            
+            save_config_sniper_tasks()
+            
+            # 立即检查新增 planCode 的可用性并加入队列
+            for new_plancode in new_plancodes:
+                try:
+                    check_and_queue_plancode(new_plancode, task, bound_config, client)
+                except Exception as e:
+                    add_log("WARNING", f"检查新增 {new_plancode} 可用性失败: {str(e)}", "config_sniper")
+    except Exception as e:
+        add_log("WARNING", f"检查新增 planCode 失败: {str(e)}", "config_sniper")
+    
+    # 遍历所有配置匹配的 API2 planCode，检查可用性并加入队列
+    for api2_plancode in matched_api2_plancodes:
+        try:
+            check_and_queue_plancode(api2_plancode, task, bound_config, client)
+        except Exception as e:
+            add_log("WARNING", f"查询 {api2_plancode} 可用性失败: {str(e)}", "config_sniper")
+
+def start_config_sniper_monitor():
+    """启动配置绑定狙击监控线程"""
+    thread = threading.Thread(target=config_sniper_monitor_loop)
+    thread.daemon = True
+    thread.start()
+    add_log("INFO", "配置绑定狙击监控线程已启动", "config_sniper")
+
+# ==================== API 接口 ====================
+
+@app.route('/api/config-sniper/options/<planCode>', methods=['GET'])
+def get_config_options(planCode):
+    """获取指定型号的所有配置选项"""
+    try:
+        client = get_ovh_client()
+        if not client:
+            return jsonify({"success": False, "error": "OVH客户端未配置"})
+        
+        # 查询 API1
+        availabilities = client.get(
+            '/dedicated/server/datacenter/availabilities',
+            planCode=planCode
+        )
+        
+        if not availabilities:
+            return jsonify({
+                "success": False,
+                "error": f"型号 {planCode} 不存在或API1中无数据"
+            })
+        
+        # 提取配置选项
+        configs = []
+        seen_configs = set()
+        
+        for item in availabilities:
+            memory = item.get("memory")
+            storage = item.get("storage")
+            config_key = (memory, storage)
+            
+            if not memory or not storage or config_key in seen_configs:
+                continue
+            seen_configs.add(config_key)
+            
+            # 查找该配置匹配的 API2 planCode
+            memory_std = standardize_config(memory)
+            storage_std = standardize_config(storage)
+            config_fingerprint = (memory_std, storage_std)
+            
+            add_log("DEBUG", f"API1 配置: memory={memory}, storage={storage}", "config_sniper")
+            add_log("DEBUG", f"标准化后: memory={memory_std}, storage={storage_std}", "config_sniper")
+            
+            matched_plancodes = find_matching_api2_plans(config_fingerprint, planCode)
+            
+            # 为每个匹配的 planCode 查询可用机房
+            plancodes_with_datacenters = []
+            for api2_plancode in matched_plancodes:
+                try:
+                    api2_availabilities = client.get(
+                        '/dedicated/server/datacenter/availabilities',
+                        planCode=api2_plancode
+                    )
+                    datacenters = []
+                    for api2_item in api2_availabilities:
+                        for dc in api2_item.get("datacenters", []):
+                            datacenter = dc.get("datacenter")
+                            if datacenter:
+                                datacenters.append(datacenter)
+                    
+                    if datacenters:  # 只返回有机房的 planCode
+                        plancodes_with_datacenters.append({
+                            "planCode": api2_plancode,
+                            "datacenters": list(set(datacenters))  # 去重
+                        })
+                except:
+                    pass  # 查询失败就跳过
+            
+            configs.append({
+                "memory": {
+                    "code": memory,
+                    "display": format_memory_display(memory)
+                },
+                "storage": {
+                    "code": storage,
+                    "display": format_storage_display(storage)
+                },
+                "matched_api2": plancodes_with_datacenters,  # planCode + 机房列表
+                "match_count": len(plancodes_with_datacenters)  # 匹配数量
+            })
+        
+        return jsonify({
+            "success": True,
+            "planCode": planCode,
+            "configs": configs,
+            "total": len(configs)
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"获取配置选项错误: {str(e)}")
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/config-sniper/tasks', methods=['GET'])
+def get_config_sniper_tasks():
+    """获取所有配置绑定狙击任务"""
+    return jsonify({
+        "success": True,
+        "tasks": config_sniper_tasks,
+        "total": len(config_sniper_tasks)
+    })
+
+@app.route('/api/config-sniper/tasks', methods=['POST'])
+def create_config_sniper_task():
+    """创建配置绑定狙击任务"""
+    try:
+        data = request.json
+        api1_planCode = data.get('api1_planCode')
+        bound_config = data.get('bound_config')
+        
+        if not api1_planCode or not bound_config:
+            return jsonify({"success": False, "error": "缺少必要参数"})
+        
+        # 标准化配置
+        memory_std = standardize_config(bound_config['memory'])
+        storage_std = standardize_config(bound_config['storage'])
+        config_fingerprint = (memory_std, storage_std)
+        
+        # 尝试在 API2 中匹配
+        matched_api2 = find_matching_api2_plans(config_fingerprint, api1_planCode)
+        
+        # 创建任务
+        task = {
+            "id": str(uuid.uuid4()),
+            "api1_planCode": api1_planCode,
+            "bound_config": bound_config,
+            "match_status": "matched" if len(matched_api2) > 0 else "pending_match",
+            "matched_api2": matched_api2 if matched_api2 else [],  # 确保是列表
+            "enabled": True,
+            "last_check": None,
+            "created_at": datetime.now().isoformat()
+        }
+        
+        config_sniper_tasks.append(task)
+        save_config_sniper_tasks()
+        
+        if len(matched_api2) > 0:
+            message = f"✅ 匹配成功，已创建监控任务（匹配到 {len(matched_api2)} 个 planCode）"
+        else:
+            message = "⏳ 暂无匹配，已创建待匹配任务（等待新增 planCode）"
+        
+        add_log("INFO", f"创建配置绑定任务: {api1_planCode} - {message}", "config_sniper")
+        
+        return jsonify({
+            "success": True,
+            "task": task,
+            "message": message
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"创建配置绑定任务错误: {str(e)}")
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/config-sniper/tasks/<task_id>', methods=['DELETE'])
+def delete_config_sniper_task(task_id):
+    """删除配置绑定狙击任务"""
+    global config_sniper_tasks
+    task = next((t for t in config_sniper_tasks if t['id'] == task_id), None)
+    
+    if not task:
+        return jsonify({"success": False, "error": "任务不存在"})
+    
+    config_sniper_tasks = [t for t in config_sniper_tasks if t['id'] != task_id]
+    save_config_sniper_tasks()
+    
+    add_log("INFO", f"删除配置绑定任务: {task['api1_planCode']}", "config_sniper")
+    
+    return jsonify({"success": True, "message": "任务已删除"})
+
+@app.route('/api/config-sniper/tasks/<task_id>/toggle', methods=['PUT'])
+def toggle_config_sniper_task(task_id):
+    """启用/禁用配置绑定狙击任务"""
+    task = next((t for t in config_sniper_tasks if t['id'] == task_id), None)
+    
+    if not task:
+        return jsonify({"success": False, "error": "任务不存在"})
+    
+    task['enabled'] = not task.get('enabled', True)
+    save_config_sniper_tasks()
+    
+    status = "启用" if task['enabled'] else "禁用"
+    add_log("INFO", f"{status}配置绑定任务: {task['api1_planCode']}", "config_sniper")
+    
+    return jsonify({
+        "success": True,
+        "enabled": task['enabled'],
+        "message": f"任务已{status}"
+    })
+
+@app.route('/api/config-sniper/quick-order', methods=['POST'])
+def quick_order():
+    """快速下单 - 直接将 planCode + 机房加入购买队列"""
+    try:
+        data = request.json
+        plancode = data.get('planCode')
+        datacenter = data.get('datacenter')
+        
+        if not plancode or not datacenter:
+            return jsonify({"success": False, "error": "缺少 planCode 或 datacenter"})
+        
+        # 直接创建队列项，不检查可用性
+        current_time = datetime.now().isoformat()
+        queue_item = {
+            "id": str(uuid.uuid4()),
+            "planCode": plancode,
+            "datacenter": datacenter,
+            "options": [],
+            "status": "running",
+            "retryCount": 0,
+            "maxRetries": 3,
+            "retryInterval": 30,
+            "createdAt": current_time,
+            "updatedAt": current_time,
+            "lastCheckTime": 0,
+            "quickOrder": True  # 标记为快速下单
+        }
+        
+        queue.append(queue_item)
+        save_data()
+        update_stats()
+        
+        add_log("INFO", f"快速下单: {plancode} ({datacenter}) 已加入队列", "config_sniper")
+        
+        return jsonify({
+            "success": True,
+            "message": f"✅ {plancode} ({datacenter}) 已加入购买队列"
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"快速下单错误: {str(e)}", "config_sniper")
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/config-sniper/tasks/<task_id>/check', methods=['POST'])
+def check_config_sniper_task(task_id):
+    """手动检查单个配置绑定狙击任务"""
+    task = next((t for t in config_sniper_tasks if t['id'] == task_id), None)
+    
+    if not task:
+        return jsonify({"success": False, "error": "任务不存在"})
+    
+    try:
+        if task['match_status'] == 'pending_match':
+            handle_pending_match_task(task)
+        elif task['match_status'] == 'matched':
+            handle_matched_task(task)
+        
+        task['last_check'] = datetime.now().isoformat()
+        save_config_sniper_tasks()
+        
+        return jsonify({
+            "success": True,
+            "message": "检查完成",
+            "task": task
+        })
+        
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
 if __name__ == '__main__':
     # 确保所有文件都存在
     ensure_files_exist()
@@ -2317,6 +2923,9 @@ if __name__ == '__main__':
     
     # Start queue processor
     start_queue_processor()
+    
+    # 启动配置绑定狙击监控
+    start_config_sniper_monitor()
     
     # 自动启动服务器监控（如果有订阅）
     if len(monitor.subscriptions) > 0:
