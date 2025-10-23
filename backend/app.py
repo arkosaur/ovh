@@ -2488,6 +2488,12 @@ def config_sniper_monitor_loop():
             # 复制列表副本，避免迭代时被修改
             tasks_snapshot = list(config_sniper_tasks)
             
+            # 调试日志：监控循环开始时的任务数量
+            if len(tasks_snapshot) == 0 and len(config_sniper_tasks) > 0:
+                add_log("WARNING", f"监控循环异常：副本为空但原列表有 {len(config_sniper_tasks)} 个任务", "config_sniper")
+            elif len(tasks_snapshot) != len(config_sniper_tasks):
+                add_log("WARNING", f"监控循环异常：副本 {len(tasks_snapshot)} 个，原列表 {len(config_sniper_tasks)} 个", "config_sniper")
+            
             for task in tasks_snapshot:
                 # 检查任务是否还在原列表中（可能已被删除，通过ID验证）
                 task_still_exists = any(t["id"] == task["id"] for t in config_sniper_tasks)
@@ -2512,7 +2518,11 @@ def config_sniper_monitor_loop():
                 # 更新最后检查时间
                 task['last_check'] = datetime.now().isoformat()
             
-            save_config_sniper_tasks()
+            # 只有列表不为空时才保存（避免误保存空列表覆盖文件）
+            if len(config_sniper_tasks) > 0:
+                save_config_sniper_tasks()
+            else:
+                add_log("WARNING", "监控循环跳过保存：任务列表为空", "config_sniper")
             time.sleep(60)  # 60秒轮询
             
         except Exception as e:
