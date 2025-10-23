@@ -2485,7 +2485,15 @@ def config_sniper_monitor_loop():
     
     while config_sniper_running:
         try:
-            for task in config_sniper_tasks:
+            # 复制列表副本，避免迭代时被修改
+            tasks_snapshot = list(config_sniper_tasks)
+            
+            for task in tasks_snapshot:
+                # 检查任务是否还在原列表中（可能已被删除，通过ID验证）
+                task_still_exists = any(t["id"] == task["id"] for t in config_sniper_tasks)
+                if not task_still_exists:
+                    continue
+                
                 if not task.get('enabled'):
                     continue
                 
@@ -2898,13 +2906,12 @@ def create_config_sniper_task():
 @app.route('/api/config-sniper/tasks/<task_id>', methods=['DELETE'])
 def delete_config_sniper_task(task_id):
     """删除配置绑定狙击任务"""
-    global config_sniper_tasks
     task = next((t for t in config_sniper_tasks if t['id'] == task_id), None)
     
     if not task:
         return jsonify({"success": False, "error": "任务不存在"})
     
-    config_sniper_tasks = [t for t in config_sniper_tasks if t['id'] != task_id]
+    config_sniper_tasks.remove(task)  # 直接删除，不重新赋值
     save_config_sniper_tasks()
     
     add_log("INFO", f"删除配置绑定任务: {task['api1_planCode']}", "config_sniper")
