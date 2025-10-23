@@ -84,7 +84,7 @@ const ConfigSniperPage: React.FC = () => {
     }
   };
 
-  const handleCreateTask = async () => {
+  const handleCreateTask = async (mode: 'matched' | 'pending_match') => {
     if (!selectedConfig) return;
 
     setLoading(true);
@@ -96,17 +96,19 @@ const ConfigSniperPage: React.FC = () => {
         bound_config: {
           memory: selectedConfig.memory.code,
           storage: selectedConfig.storage.code
-        }
+        },
+        mode: mode  // 添加模式参数
       });
 
       if (response.data.success) {
-        alert(response.data.message);
+        showToast({ type: 'success', title: response.data.message });
         await loadTasks();
         setPlanCode('');
         setSelectedConfig(null);
         setConfigOptions([]);
         setStep('tasks');
       } else {
+        showToast({ type: 'error', title: response.data.error || '创建失败' });
         setError(response.data.error || '创建失败');
       }
     } catch (err: any) {
@@ -385,20 +387,45 @@ const ConfigSniperPage: React.FC = () => {
             ))}
           </div>
 
-          <div className="mt-6 flex gap-4">
+          <div className="mt-6 flex flex-col gap-4">
+            <div className="p-4 bg-cyber-grid/30 border border-cyber-accent/30 rounded-lg">
+              <p className="text-cyber-text font-semibold mb-3">选择监控模式：</p>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => handleCreateTask('matched')}
+                  disabled={!selectedConfig || loading || selectedConfig.match_count === 0}
+                  className="flex-1 px-6 py-4 bg-green-500/20 border-2 border-green-500/50 text-green-400 rounded-lg hover:bg-green-500/30 hover:border-green-500 disabled:bg-cyber-grid disabled:text-cyber-muted disabled:border-cyber-grid disabled:cursor-not-allowed flex flex-col items-center gap-2 transition-all shadow-neon-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <CheckCircle size={18} />
+                    <span className="font-bold">{loading ? '创建中...' : '已匹配模式'}</span>
+                  </div>
+                  <span className="text-xs text-center">
+                    监控 {selectedConfig?.match_count || 0} 个已知型号，有货立即下单
+                  </span>
+                </button>
+                
+                <button
+                  onClick={() => handleCreateTask('pending_match')}
+                  disabled={!selectedConfig || loading}
+                  className="flex-1 px-6 py-4 bg-yellow-500/20 border-2 border-yellow-500/50 text-yellow-400 rounded-lg hover:bg-yellow-500/30 hover:border-yellow-500 disabled:bg-cyber-grid disabled:text-cyber-muted disabled:border-cyber-grid disabled:cursor-not-allowed flex flex-col items-center gap-2 transition-all shadow-neon-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <Clock size={18} />
+                    <span className="font-bold">{loading ? '创建中...' : '未匹配模式'}</span>
+                  </div>
+                  <span className="text-xs text-center">
+                    排除 {selectedConfig?.match_count || 0} 个已知型号，等待新增型号
+                  </span>
+                </button>
+              </div>
+            </div>
+            
             <button
-              onClick={() => { setStep('input'); setConfigOptions([]); setSelectedConfig(null); }}
-              className="px-6 py-3 border border-cyber-accent/30 text-cyber-text rounded-lg hover:bg-cyber-grid/50 transition-all"
+              onClick={() => setStep('input')}
+              className="px-6 py-3 border border-cyber-accent/50 text-cyber-text rounded-lg hover:bg-cyber-accent/10 transition-all"
             >
-              上一步
-            </button>
-            <button
-              onClick={handleCreateTask}
-              disabled={!selectedConfig || loading}
-              className="flex-1 px-6 py-3 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 disabled:bg-cyber-grid disabled:text-cyber-muted disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all shadow-neon-sm"
-            >
-              <Plus size={18} />
-              {loading ? '创建中...' : '创建监控任务'}
+              ← 返回上一步
             </button>
           </div>
         </motion.div>

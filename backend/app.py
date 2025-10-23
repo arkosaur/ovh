@@ -2375,8 +2375,20 @@ def standardize_config(config_str):
     
     return normalized
 
-def find_matching_api2_plans(config_fingerprint, target_plancode_base=None):
-    """在 API2 catalog 中查找配置匹配的所有 planCode（返回列表）"""
+def find_matching_api2_plans(config_fingerprint, target_plancode_base=None, exclude_known=False):
+    """在 API2 catalog 中查找匹配的 planCode
+    
+    Args:
+        config_fingerprint: 配置指纹 (memory, storage)
+        target_plancode_base: 目标型号（用于日志）
+        exclude_known: 是否排除已知型号（用于增量匹配）
+    
+    Returns:
+        list: 匹配的 planCode 列表
+        
+    逻辑：
+        配置匹配模式：查找所有相同配置的型号
+    """
     client = get_ovh_client()
     if not client:
         return []
@@ -2385,6 +2397,8 @@ def find_matching_api2_plans(config_fingerprint, target_plancode_base=None):
         catalog = client.get(f'/order/catalog/public/eco?ovhSubsidiary={config["zone"]}')
         matched_plancodes = []
         
+        # 配置匹配模式：查找所有相同配置的型号
+        add_log("INFO", f"🔍 配置匹配模式：查找所有相同配置的型号", "config_sniper")
         for plan in catalog.get("plans", []):
             plan_code = plan.get("planCode")
             addon_families = plan.get("addonFamilies", [])
@@ -2397,10 +2411,18 @@ def find_matching_api2_plans(config_fingerprint, target_plancode_base=None):
                 family_name = family.get("name", "").lower()
                 addons = family.get("addons", [])
                 
-                if family_name == "memory" and addons:
-                    memory_options.extend(addons)
-                elif family_name == "storage" and addons:
-                    storage_options.extend(addons)
+                if family_name == "memory":
+                    # 找到匹配的 memory 配置
+                    target_memory_std = standardize_config(config_fingerprint[0])
+                    for addon in addons:
+                        if standardize_config(addon) == target_memory_std:
+                            memory_options.append(addon)
+                elif family_name == "storage":
+                    # 找到匹配的 storage 配置
+                    target_storage_std = standardize_config(config_fingerprint[1])
+                    for addon in addons:
+                        if standardize_config(addon) == target_storage_std:
+                            storage_options.append(addon)
             
             # 遍历所有内存和存储的组合
             if memory_options and storage_options:
@@ -2490,7 +2512,7 @@ def config_sniper_monitor_loop():
             time.sleep(60)
 
 def handle_pending_match_task(task):
-    """处理待匹配任务 - 增量匹配新增的 planCode"""
+    """处理待匹配任务 - 增量匹配新增的 planCode，排除已知型号"""
     config = task['bound_config']
     memory_std = standardize_config(config['memory'])
     storage_std = standardize_config(config['storage'])
@@ -2499,11 +2521,13 @@ def handle_pending_match_task(task):
     # 查询当前所有配置匹配的 planCode
     current_matched = find_matching_api2_plans(config_fingerprint, task['api1_planCode'])
     
-    # 获取已记录的 planCode（避免重复）
+    # 获取已知型号排除列表（避免重复下单已知型号）
+    known_plancodes = task.get('known_plancodes', [])
     existing_matched = task.get('matched_api2', [])
+    all_known = set(known_plancodes + existing_matched)
     
-    # 找出新增的 planCode（增量匹配）
-    new_plancodes = [pc for pc in current_matched if pc not in existing_matched]
+    # 找出新增的 planCode（排除所有已知型号）
+    new_plancodes = [pc for pc in current_matched if pc not in all_known]
     
     if new_plancodes:
         # 发现新增的 planCode！
@@ -2522,20 +2546,31 @@ def handle_pending_match_task(task):
             f"总计: {len(task['matched_api2'])} 个"
         )
         
-        # 如果是第一次匹配成功，转为已匹配状态
-        if task['match_status'] == 'pending_match':
-            task['match_status'] = 'matched'
-        
         save_config_sniper_tasks()
         
-        # 立即检查新增 planCode 的可用性并加入队列
+        # 立即检查新增 planCode 的可用性并加入队列（所有机房）
         client = get_ovh_client()
+        has_queued = False
         if client:
             for new_plancode in new_plancodes:
                 try:
-                    check_and_queue_plancode(new_plancode, task, config, client)
+                    if check_and_queue_plancode(new_plancode, task, config, client):
+                        has_queued = True
                 except Exception as e:
                     add_log("WARNING", f"检查新增 {new_plancode} 可用性失败: {str(e)}", "config_sniper")
+        
+        # 立即标记任务为已完成（一次性下单，不再继续监控）
+        if has_queued:
+            task['match_status'] = 'completed'
+            save_config_sniper_tasks()
+            add_log("INFO", f"✅ 未匹配任务完成！{task['api1_planCode']} 发现新增并已下单，任务结束", "config_sniper")
+            send_telegram_msg(
+                f"✅ 未匹配任务完成！\n"
+                f"型号: {task['api1_planCode']}\n"
+                f"配置: {format_memory_display(config['memory'])} + {format_storage_display(config['storage'])}\n"
+                f"发现新增型号: {', '.join(new_plancodes)}\n"
+                f"已下单所有机房，任务已完成"
+            )
     else:
         add_log("DEBUG", f"待匹配任务 {task['api1_planCode']} 暂无新增", "config_sniper")
 
@@ -2835,6 +2870,7 @@ def create_config_sniper_task():
         data = request.json
         api1_planCode = data.get('api1_planCode')
         bound_config = data.get('bound_config')
+        mode = data.get('mode', 'matched')  # 'matched' 或 'pending_match'
         
         if not api1_planCode or not bound_config:
             return jsonify({"success": False, "error": "缺少必要参数"})
@@ -2844,28 +2880,44 @@ def create_config_sniper_task():
         storage_std = standardize_config(bound_config['storage'])
         config_fingerprint = (memory_std, storage_std)
         
-        # 尝试在 API2 中匹配
-        matched_api2 = find_matching_api2_plans(config_fingerprint, api1_planCode)
+        # 查询当前所有配置匹配的 planCode
+        current_matched = find_matching_api2_plans(config_fingerprint, api1_planCode)
         
-        # 创建任务
-        task = {
-            "id": str(uuid.uuid4()),
-            "api1_planCode": api1_planCode,
-            "bound_config": bound_config,
-            "match_status": "matched" if len(matched_api2) > 0 else "pending_match",
-            "matched_api2": matched_api2 if matched_api2 else [],  # 确保是列表
-            "enabled": True,
-            "last_check": None,
-            "created_at": datetime.now().isoformat()
-        }
+        # 根据用户选择的模式创建任务
+        if mode == 'pending_match':
+            # 未匹配模式：记录当前所有已知型号作为排除列表，等待新增
+            task = {
+                "id": str(uuid.uuid4()),
+                "api1_planCode": api1_planCode,
+                "bound_config": bound_config,
+                "match_status": "pending_match",
+                "matched_api2": [],  # 空列表，等待新增
+                "known_plancodes": current_matched,  # 已知型号排除列表
+                "enabled": True,
+                "last_check": None,
+                "created_at": datetime.now().isoformat()
+            }
+            message = f"⏳ 已创建待匹配任务（已排除 {len(current_matched)} 个已知型号，等待新增型号）"
+        else:
+            # 已匹配模式：正常监控这些型号
+            task = {
+                "id": str(uuid.uuid4()),
+                "api1_planCode": api1_planCode,
+                "bound_config": bound_config,
+                "match_status": "matched" if len(current_matched) > 0 else "pending_match",
+                "matched_api2": current_matched if current_matched else [],
+                "known_plancodes": [],  # 不需要排除列表
+                "enabled": True,
+                "last_check": None,
+                "created_at": datetime.now().isoformat()
+            }
+            if len(current_matched) > 0:
+                message = f"✅ 已创建监控任务（监控 {len(current_matched)} 个型号）"
+            else:
+                message = "⏳ 未找到匹配，已创建待匹配任务"
         
         config_sniper_tasks.append(task)
         save_config_sniper_tasks()
-        
-        if len(matched_api2) > 0:
-            message = f"✅ 匹配成功，已创建监控任务（匹配到 {len(matched_api2)} 个 planCode）"
-        else:
-            message = "⏳ 暂无匹配，已创建待匹配任务（等待新增 planCode）"
         
         add_log("INFO", f"创建配置绑定任务: {api1_planCode} - {message}", "config_sniper")
         
