@@ -2556,13 +2556,14 @@ def check_and_queue_plancode(api2_plancode, task, bound_config, client):
                     f"🎯 发现可用！API2={api2_plancode} 机房={datacenter} 状态={availability}", 
                     "config_sniper")
                 
-                # 检查是否已在队列中
+                # 检查是否已在队列中（同一个 planCode + datacenter 组合）
                 existing_queue_item = next((q for q in queue 
                     if q['planCode'] == api2_plancode 
+                    and q['datacenter'] == datacenter
                     and q.get('configSniperTaskId') == task['id']), None)
                 
                 if existing_queue_item:
-                    add_log("DEBUG", f"{api2_plancode} 已在队列中，跳过", "config_sniper")
+                    add_log("DEBUG", f"{api2_plancode} ({datacenter}) 已在队列中，跳过", "config_sniper")
                     continue
                 
                 # 添加到购买队列（用 API2 planCode 下单，带上用户选择的配置）
