@@ -2389,32 +2389,45 @@ def find_matching_api2_plans(config_fingerprint, target_plancode_base=None):
             plan_code = plan.get("planCode")
             addon_families = plan.get("addonFamilies", [])
             
-            # 提取配置
-            memory_config = None
-            storage_config = None
+            # 提取所有可能的配置组合（包括 default 和 addons）
+            memory_options = []
+            storage_options = []
             
             for family in addon_families:
                 family_name = family.get("name", "").lower()
-                default_addon = family.get("default")
+                addons = family.get("addons", [])
                 
-                if family_name == "memory" and default_addon:
-                    memory_config = default_addon
-                elif family_name == "storage" and default_addon:
-                    storage_config = default_addon
+                if family_name == "memory" and addons:
+                    memory_options.extend(addons)
+                elif family_name == "storage" and addons:
+                    storage_options.extend(addons)
             
-            if memory_config and storage_config:
-                # 标准化并比较（配置匹配）
-                plan_fingerprint = (
-                    standardize_config(memory_config),
-                    standardize_config(storage_config)
-                )
-                
-                # 记录所有扫描到的 API2 配置（用于调试）
-                add_log("DEBUG", f"API2 扫描: {plan_code}, memory={standardize_config(memory_config)}, storage={standardize_config(storage_config)}", "config_sniper")
-                
-                if plan_fingerprint == config_fingerprint:
-                    matched_plancodes.append(plan_code)
-                    add_log("INFO", f"✓ API2 配置匹配: {plan_code}", "config_sniper")
+            # 遍历所有内存和存储的组合
+            if memory_options and storage_options:
+                for memory_config in memory_options:
+                    for storage_config in storage_options:
+                        # 标准化并比较（配置匹配）
+                        plan_fingerprint = (
+                            standardize_config(memory_config),
+                            standardize_config(storage_config)
+                        )
+                        
+                        # 记录所有扫描到的 API2 配置（用于调试）
+                        add_log("DEBUG", f"API2 扫描: {plan_code}, memory={standardize_config(memory_config)}, storage={standardize_config(storage_config)}", "config_sniper")
+                        
+                        # 特别记录 64GB 内存的配置（用于调试）
+                        if "64g" in standardize_config(memory_config):
+                            add_log("INFO", f"🔍 发现 64GB 配置: {plan_code} | {memory_config} → {standardize_config(memory_config)} | {storage_config} → {standardize_config(storage_config)}", "config_sniper")
+                        
+                        if plan_fingerprint == config_fingerprint:
+                            # 避免重复添加同一个 planCode
+                            if plan_code not in matched_plancodes:
+                                matched_plancodes.append(plan_code)
+                                add_log("INFO", f"✓ API2 配置匹配: {plan_code}", "config_sniper")
+                            break  # 找到一个匹配就跳出内层循环
+                    else:
+                        continue
+                    break  # 找到匹配后跳出外层循环
         
         add_log("INFO", f"配置匹配完成，找到 {len(matched_plancodes)} 个 API2 planCode", "config_sniper")
         return matched_plancodes
