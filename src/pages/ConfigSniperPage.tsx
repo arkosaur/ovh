@@ -36,12 +36,13 @@ interface ConfigSniperTask {
 
 const ConfigSniperPage: React.FC = () => {
   const { showToast, showConfirm } = useToast();
-  const [step, setStep] = useState<'input' | 'select' | 'tasks'>('input');
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [planCode, setPlanCode] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [configOptions, setConfigOptions] = useState<ConfigOption[]>([]);
-  const [selectedConfig, setSelectedConfig] = useState<ConfigOption | null>(null);
+  const [configs, setConfigs] = useState<ConfigOption[]>([]);
   const [tasks, setTasks] = useState<ConfigSniperTask[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [queryMode, setQueryMode] = useState<'input' | 'select'>('input');
+  const [selectedConfig, setSelectedConfig] = useState<ConfigOption | null>(null);
   const [error, setError] = useState('');
 
   const loadTasks = async () => {
@@ -71,12 +72,9 @@ const ConfigSniperPage: React.FC = () => {
     try {
       const response = await apiClient.get(`/config-sniper/options/${planCode.trim()}`);
       
-      if (response.data.success) {
-        setConfigOptions(response.data.configs);
-        setStep('select');
-      } else {
-        setError(response.data.error || '查询失败');
-      }
+      showToast({ type: 'success', title: '查询成功' });
+      setConfigs(response.data.configs);
+      setQueryMode('select');
     } catch (err: any) {
       setError(err.response?.data?.error || '查询失败');
     } finally {
@@ -104,9 +102,11 @@ const ConfigSniperPage: React.FC = () => {
         showToast({ type: 'success', title: response.data.message });
         await loadTasks();
         setPlanCode('');
-        setSelectedConfig(null);
-        setConfigOptions([]);
-        setStep('tasks');
+        // showToast already called above
+        setShowCreateForm(false);
+        setQueryMode('input');
+        setPlanCode('');
+        setConfigs([]);
       } else {
         showToast({ type: 'error', title: response.data.error || '创建失败' });
         setError(response.data.error || '创建失败');
@@ -246,17 +246,28 @@ const ConfigSniperPage: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 bg-cyber-accent/10 rounded-lg border border-cyber-accent/30">
-            <Target className="text-cyber-accent" size={24} />
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-cyber-accent/10 rounded-lg border border-cyber-accent/30">
+              <Target className="text-cyber-accent" size={24} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold cyber-glow-text">配置绑定狙击</h1>
+              <p className="text-cyber-muted text-sm">输入型号→选择配置→匹配 API2→监控可用性→自动下单</p>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold cyber-glow-text">配置绑定狙击</h1>
+          <button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="px-4 py-2 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 flex items-center gap-2 transition-all shadow-neon-sm"
+          >
+            <Plus size={18} />
+            {showCreateForm ? '隐藏创建表单' : '新建任务'}
+          </button>
         </div>
-        <p className="text-cyber-muted">输入型号→选择配置→匹配 API2→监控可用性→自动下单</p>
       </motion.div>
 
-      {/* 步骤 1: 输入型号 */}
-      {step === 'input' && (
+      {/* 创建任务表单 */}
+      {showCreateForm && queryMode === 'input' && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -287,19 +298,11 @@ const ConfigSniperPage: React.FC = () => {
               {error}
             </div>
           )}
-          <div className="mt-6">
-            <button
-              onClick={() => setStep('tasks')}
-              className="text-cyber-accent hover:text-cyber-neon flex items-center gap-2 transition-colors"
-            >
-              查看已创建的任务 →
-            </button>
-          </div>
         </motion.div>
       )}
 
       {/* 步骤 2: 选择配置 */}
-      {step === 'select' && (
+      {showCreateForm && queryMode === 'select' && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -308,7 +311,7 @@ const ConfigSniperPage: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-cyber-text">步骤 2: 选择配置</h2>
             <button
-              onClick={() => { setStep('input'); setConfigOptions([]); setSelectedConfig(null); }}
+              onClick={() => { setQueryMode('input'); setConfigs([]); setSelectedConfig(null); }}
               className="text-cyber-muted hover:text-cyber-text transition-colors"
             >
               ← 返回
@@ -318,12 +321,12 @@ const ConfigSniperPage: React.FC = () => {
           <div className="mb-4 p-4 bg-cyber-accent/10 border border-cyber-accent/30 rounded-lg">
             <p className="text-cyber-text">
               <strong>型号:</strong> {planCode} | 
-              <strong className="ml-4">找到 {configOptions.length} 种配置</strong>
+              <strong className="ml-4">找到 {configs.length} 种配置</strong>
             </p>
           </div>
 
           <div className="space-y-4">
-            {configOptions.map((config, index) => (
+            {configs.map((config, index) => (
               <div
                 key={index}
                 onClick={() => setSelectedConfig(config)}
@@ -429,7 +432,7 @@ const ConfigSniperPage: React.FC = () => {
             </div>
             
             <button
-              onClick={() => setStep('input')}
+              onClick={() => setQueryMode('input')}
               className="px-6 py-3 border border-cyber-accent/50 text-cyber-text rounded-lg hover:bg-cyber-accent/10 transition-all"
             >
               ← 返回上一步
@@ -438,8 +441,8 @@ const ConfigSniperPage: React.FC = () => {
         </motion.div>
       )}
 
-      {/* 步骤 3: 任务列表 */}
-      {step === 'tasks' && (
+      {/* 任务列表 - 始终显示 */}
+      {true && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -447,22 +450,13 @@ const ConfigSniperPage: React.FC = () => {
         >
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-cyber-text">监控任务列表</h2>
-            <div className="flex gap-4">
-              <button
-                onClick={loadTasks}
-                className="px-4 py-2 border border-cyber-accent/30 text-cyber-text rounded-lg hover:bg-cyber-grid/50 flex items-center gap-2 transition-all"
-              >
-                <RefreshCw size={18} />
-                刷新
-              </button>
-              <button
-                onClick={() => setStep('input')}
-                className="px-4 py-2 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 flex items-center gap-2 transition-all shadow-neon-sm"
-              >
-                <Plus size={18} />
-                新建任务
-              </button>
-            </div>
+            <button
+              onClick={loadTasks}
+              className="px-4 py-2 border border-cyber-accent/30 text-cyber-text rounded-lg hover:bg-cyber-grid/50 flex items-center gap-2 transition-all"
+            >
+              <RefreshCw size={18} />
+              刷新
+            </button>
           </div>
 
           {tasks.length === 0 ? (
