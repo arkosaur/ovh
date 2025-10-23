@@ -211,8 +211,7 @@ def save_data():
     try:
         with open(CONFIG_FILE, 'w') as f:
             json.dump(config, f)
-        with open(LOGS_FILE, 'w') as f:
-            json.dump(logs, f)
+        flush_logs()  # 使用批量刷新函数
         with open(QUEUE_FILE, 'w') as f:
             json.dump(queue, f)
         with open(HISTORY_FILE, 'w') as f:
@@ -248,9 +247,13 @@ def save_config_sniper_tasks():
     except Exception as e:
         logging.error(f"保存配置狙击任务时出错: {str(e)}")
 
+# 日志缓冲区：批量写入以提高性能
+log_write_counter = 0
+LOG_WRITE_THRESHOLD = 10  # 每10条日志写一次文件
+
 # Add a log entry
 def add_log(level, message, source="system"):
-    global logs
+    global logs, log_write_counter
     log_entry = {
         "id": str(uuid.uuid4()),
         "timestamp": datetime.now().isoformat(),
@@ -264,9 +267,17 @@ def add_log(level, message, source="system"):
     if len(logs) > 1000:
         logs = logs[-1000:]
     
-    # Save logs to file
-    with open(LOGS_FILE, 'w') as f:
-        json.dump(logs, f)
+    # 批量写入：每N条或ERROR级别立即写入
+    log_write_counter += 1
+    should_write = (log_write_counter >= LOG_WRITE_THRESHOLD) or (level == "ERROR")
+    
+    if should_write:
+        try:
+            with open(LOGS_FILE, 'w') as f:
+                json.dump(logs, f)
+            log_write_counter = 0
+        except Exception as e:
+            logging.error(f"写入日志文件失败: {str(e)}")
     
     # Also print to console
     if level == "ERROR":
@@ -275,6 +286,17 @@ def add_log(level, message, source="system"):
         logging.warning(f"[{source}] {message}")
     else:
         logging.info(f"[{source}] {message}")
+
+# 强制写入所有日志到文件
+def flush_logs():
+    global logs, log_write_counter
+    try:
+        with open(LOGS_FILE, 'w') as f:
+            json.dump(logs, f)
+        log_write_counter = 0
+        logging.info("日志已强制刷新到文件")
+    except Exception as e:
+        logging.error(f"强制写入日志文件失败: {str(e)}")
 
 # Update statistics
 def update_stats():
@@ -1856,20 +1878,24 @@ def verify_auth():
     try:
         # Try a simple API call to check authentication
         client.get("/me")
-        return jsonify({"valid": True})
-    except Exception as e:
-        add_log("ERROR", f"Authentication verification failed: {str(e)}")
-        return jsonify({"valid": False})
 
 @app.route('/api/logs', methods=['GET'])
 def get_logs():
+    # 先刷新日志到文件，确保返回最新数据
+    flush_logs()
     return jsonify(logs)
+
+@app.route('/api/logs/flush', methods=['POST'])
+def force_flush_logs():
+    """强制刷新日志到文件"""
+    flush_logs()
+    return jsonify({"status": "success", "message": "日志已刷新"})
 
 @app.route('/api/logs', methods=['DELETE'])
 def clear_logs():
     global logs
     logs = []
-    save_data()
+    flush_logs()  # 立即写入空日志
     add_log("INFO", "Logs cleared")
     return jsonify({"status": "success"})
 
