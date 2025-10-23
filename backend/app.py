@@ -1878,6 +1878,10 @@ def verify_auth():
     try:
         # Try a simple API call to check authentication
         client.get("/me")
+        return jsonify({"valid": True})
+    except Exception as e:
+        add_log("ERROR", f"Authentication verification failed: {str(e)}")
+        return jsonify({"valid": False})
 
 @app.route('/api/logs', methods=['GET'])
 def get_logs():
