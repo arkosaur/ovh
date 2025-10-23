@@ -2565,13 +2565,51 @@ def check_and_queue_plancode(api2_plancode, task, bound_config, client):
                     add_log("DEBUG", f"{api2_plancode} 已在队列中，跳过", "config_sniper")
                     continue
                 
-                # 添加到购买队列（用 API2 planCode 下单）
+                # 添加到购买队列（用 API2 planCode 下单，带上用户选择的配置）
                 current_time = datetime.now().isoformat()
+                
+                # 从 bound_config 中获取用户选择的原始配置（非标准化版本）
+                # bound_config 存储的是 API1 的配置代码，需要转换为 API2 的配置代码
+                # 我们需要从 API2 中找到对应的 memory 和 storage 选项
+                hardware_options = []
+                try:
+                    # 获取该 planCode 的配置选项
+                    catalog = client.get(f'/order/catalog/public/eco?ovhSubsidiary={config["zone"]}')
+                    for plan in catalog.get("plans", []):
+                        if plan.get("planCode") == api2_plancode:
+                            addon_families = plan.get("addonFamilies", [])
+                            
+                            # 提取 memory 和 storage 的 addons
+                            for family in addon_families:
+                                family_name = family.get("name", "").lower()
+                                addons = family.get("addons", [])
+                                
+                                if family_name == "memory":
+                                    # 找到匹配的 memory 配置
+                                    target_memory_std = standardize_config(bound_config['memory'])
+                                    for addon in addons:
+                                        if standardize_config(addon) == target_memory_std:
+                                            hardware_options.append(addon)
+                                            add_log("DEBUG", f"添加 memory 选项: {addon}", "config_sniper")
+                                            break
+                                
+                                elif family_name == "storage":
+                                    # 找到匹配的 storage 配置
+                                    target_storage_std = standardize_config(bound_config['storage'])
+                                    for addon in addons:
+                                        if standardize_config(addon) == target_storage_std:
+                                            hardware_options.append(addon)
+                                            add_log("DEBUG", f"添加 storage 选项: {addon}", "config_sniper")
+                                            break
+                            break
+                except Exception as e:
+                    add_log("WARNING", f"获取 {api2_plancode} 的配置选项失败: {str(e)}", "config_sniper")
+                
                 queue_item = {
                     "id": str(uuid.uuid4()),
                     "planCode": api2_plancode,
                     "datacenter": datacenter,
-                    "options": [],
+                    "options": hardware_options,  # 用户选择的 memory + storage
                     "status": "running",
                     "retryCount": 0,
                     "maxRetries": 3,
