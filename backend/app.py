@@ -2488,7 +2488,11 @@ def config_sniper_monitor_loop():
             # 复制列表副本，避免迭代时被修改
             tasks_snapshot = list(config_sniper_tasks)
             
-            # 调试日志：监控循环开始时的任务数量
+            # 调试日志：监控循环开始时的任务数量（添加线程ID）
+            import threading
+            thread_id = threading.current_thread().ident
+            add_log("DEBUG", f"监控循环[线程{thread_id}]: 任务数={len(config_sniper_tasks)}, 列表ID={id(config_sniper_tasks)}", "config_sniper")
+            
             if len(tasks_snapshot) == 0 and len(config_sniper_tasks) > 0:
                 add_log("WARNING", f"监控循环异常：副本为空但原列表有 {len(config_sniper_tasks)} 个任务", "config_sniper")
             elif len(tasks_snapshot) != len(config_sniper_tasks):
@@ -2739,6 +2743,13 @@ def handle_matched_task(task):
 
 def start_config_sniper_monitor():
     """启动配置绑定狙击监控线程"""
+    global config_sniper_running
+    
+    # 防止重复启动（Flask debug模式会导致重载）
+    if config_sniper_running:
+        add_log("WARNING", "配置绑定狙击监控已在运行，跳过重复启动", "config_sniper")
+        return
+    
     thread = threading.Thread(target=config_sniper_monitor_loop)
     thread.daemon = True
     thread.start()
@@ -2899,6 +2910,7 @@ def create_config_sniper_task():
                 message = "⏳ 未找到匹配，已创建待匹配任务"
         
         config_sniper_tasks.append(task)
+        add_log("DEBUG", f"任务已添加到列表: 当前数量={len(config_sniper_tasks)}, 列表ID={id(config_sniper_tasks)}", "config_sniper")
         save_config_sniper_tasks()
         
         add_log("INFO", f"创建配置绑定任务: {api1_planCode} - {message}", "config_sniper")
@@ -3035,11 +3047,23 @@ if __name__ == '__main__':
         monitor.check_interval = 60
         save_subscriptions()
     
-    # Start queue processor
-    start_queue_processor()
+    # 只在主进程启动后台线程（避免Flask reloader重复启动）
+    # 使用环境变量判断是否为主进程
+    import os
+    is_main_process = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
     
-    # 启动配置绑定狙击监控
-    start_config_sniper_monitor()
+    print(f"进程检查: WERKZEUG_RUN_MAIN={os.environ.get('WERKZEUG_RUN_MAIN')}, 是否启动后台线程={is_main_process}")
+    
+    if is_main_process or not app.debug:
+        # 在主进程或非debug模式下启动后台线程
+        print("启动后台线程...")
+        # Start queue processor
+        start_queue_processor()
+        
+        # 启动配置绑定狙击监控
+        start_config_sniper_monitor()
+    else:
+        print("跳过后台线程启动（等待主进程）")
     
     # 自动启动服务器监控（如果有订阅）
     if len(monitor.subscriptions) > 0:
@@ -3050,4 +3074,5 @@ if __name__ == '__main__':
     add_log("INFO", "Server started")
     
     # Run the Flask app
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # 生产环境建议关闭 debug，避免多线程问题
+    app.run(host='0.0.0.0', port=5000, debug=False)
