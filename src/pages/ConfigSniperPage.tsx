@@ -27,7 +27,7 @@ interface ConfigSniperTask {
     memory: string;
     storage: string;
   };
-  match_status: 'matched' | 'pending_match';
+  match_status: 'matched' | 'pending_match' | 'completed';
   matched_api2: string[]; // API2 planCode 列表
   enabled: boolean;
   last_check: string | null;
@@ -220,7 +220,14 @@ const ConfigSniperPage: React.FC = () => {
     if (status === 'matched') {
       return (
         <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-green-400 bg-green-400/10 border border-green-400/30 rounded">
-          <CheckCircle size={14} className="mr-1" />已匹配（监控新增）
+          <CheckCircle size={14} className="mr-1" />已匹配（监控可用）
+        </span>
+      );
+    }
+    if (status === 'completed') {
+      return (
+        <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded">
+          <CheckCircle size={14} className="mr-1" />已完成
         </span>
       );
     }
@@ -473,13 +480,15 @@ const ConfigSniperPage: React.FC = () => {
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-lg font-semibold text-cyber-text">{task.api1_planCode}</h3>
                         {getMatchStatusBadge(task.match_status)}
-                        <span className={`px-2 py-1 text-xs rounded border ${
-                          task.enabled 
-                            ? 'bg-green-400/10 text-green-400 border-green-400/30' 
-                            : 'bg-cyber-grid text-cyber-muted border-cyber-accent/20'
-                        }`}>
-                          {task.enabled ? '● 监控中' : '○ 已暂停'}
-                        </span>
+                        {task.match_status !== 'completed' && (
+                          <span className={`px-2 py-1 text-xs rounded border ${
+                            task.enabled 
+                              ? 'bg-green-400/10 text-green-400 border-green-400/30' 
+                              : 'bg-cyber-grid text-cyber-muted border-cyber-accent/20'
+                          }`}>
+                            {task.enabled ? '● 监控中' : '○ 已暂停'}
+                          </span>
+                        )}
                       </div>
 
                       <div className="text-sm text-cyber-muted space-y-1">
@@ -496,6 +505,12 @@ const ConfigSniperPage: React.FC = () => {
                           </p>
                         )}
                         
+                        {task.match_status === 'completed' && (
+                          <p className="text-blue-400">
+                            <strong>✓ 任务已完成：</strong>已发现可用服务器并加入购买队列
+                          </p>
+                        )}
+                        
                         <p>
                           <strong className="text-cyber-text">创建时间:</strong> {new Date(task.created_at).toLocaleString('zh-CN')}
                         </p>
@@ -509,25 +524,29 @@ const ConfigSniperPage: React.FC = () => {
                     </div>
 
                     <div className="flex flex-col gap-2 ml-4">
-                      <button
-                        onClick={() => handleToggleTask(task.id)}
-                        className={`px-3 py-1 rounded flex items-center gap-1 text-sm transition-all ${
-                          task.enabled
-                            ? 'bg-yellow-400/10 text-yellow-400 border border-yellow-400/30 hover:bg-yellow-400/20'
-                            : 'bg-green-400/10 text-green-400 border border-green-400/30 hover:bg-green-400/20'
-                        }`}
-                      >
-                        {task.enabled ? <Pause size={14} /> : <Play size={14} />}
-                        {task.enabled ? '暂停' : '启动'}
-                      </button>
-                      
-                      <button
-                        onClick={() => handleCheckTask(task.id)}
-                        className="px-3 py-1 bg-cyber-accent/10 text-cyber-accent border border-cyber-accent/30 rounded hover:bg-cyber-accent/20 flex items-center gap-1 text-sm transition-all"
-                      >
-                        <RefreshCw size={14} />
-                        立即检查
-                      </button>
+                      {task.match_status !== 'completed' && (
+                        <>
+                          <button
+                            onClick={() => handleToggleTask(task.id)}
+                            className={`px-3 py-1 rounded flex items-center gap-1 text-sm transition-all ${
+                              task.enabled
+                                ? 'bg-yellow-400/10 text-yellow-400 border border-yellow-400/30 hover:bg-yellow-400/20'
+                                : 'bg-green-400/10 text-green-400 border border-green-400/30 hover:bg-green-400/20'
+                            }`}
+                          >
+                            {task.enabled ? <Pause size={14} /> : <Play size={14} />}
+                            {task.enabled ? '暂停' : '启动'}
+                          </button>
+                          
+                          <button
+                            onClick={() => handleCheckTask(task.id)}
+                            className="px-3 py-1 bg-cyber-accent/10 text-cyber-accent border border-cyber-accent/30 rounded hover:bg-cyber-accent/20 flex items-center gap-1 text-sm transition-all"
+                          >
+                            <RefreshCw size={14} />
+                            立即检查
+                          </button>
+                        </>
+                      )}
                       
                       <button
                         onClick={() => handleDeleteTask(task.id)}
