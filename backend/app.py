@@ -2690,51 +2690,15 @@ def check_and_queue_plancode(api2_plancode, task, bound_config, client):
     return queued_count > 0
 
 def handle_matched_task(task):
-    """处理已匹配任务 - 监控可用性 + 检测新增 planCode"""
+    """处理已匹配任务 - 只监控已知型号的可用性（一次性狙击）"""
     bound_config = task['bound_config']
-    matched_api2_plancodes = task['matched_api2']  # API2 planCode 列表（配置已匹配）
+    matched_api2_plancodes = task['matched_api2']  # API2 planCode 列表（已知型号）
     
     client = get_ovh_client()
     if not client:
         return
     
-    # 定期检查是否有新增的 planCode（每次监控时都检查）
-    try:
-        memory_std = standardize_config(bound_config['memory'])
-        storage_std = standardize_config(bound_config['storage'])
-        config_fingerprint = (memory_std, storage_std)
-        
-        current_matched = find_matching_api2_plans(config_fingerprint, task['api1_planCode'])
-        new_plancodes = [pc for pc in current_matched if pc not in matched_api2_plancodes]
-        
-        if new_plancodes:
-            # 发现新增！
-            task['matched_api2'] = matched_api2_plancodes + new_plancodes
-            matched_api2_plancodes = task['matched_api2']  # 更新本地变量
-            
-            add_log("INFO", 
-                f"🆕 已匹配任务发现新增！{task['api1_planCode']} 新增 {len(new_plancodes)} 个：{', '.join(new_plancodes)}", 
-                "config_sniper")
-            
-            send_telegram_msg(
-                f"🆕 监控中发现新增！\n"
-                f"型号: {task['api1_planCode']}\n"
-                f"新增: {', '.join(new_plancodes)}\n"
-                f"总计: {len(task['matched_api2'])} 个 planCode"
-            )
-            
-            save_config_sniper_tasks()
-            
-            # 立即检查新增 planCode 的可用性并加入队列
-            for new_plancode in new_plancodes:
-                try:
-                    check_and_queue_plancode(new_plancode, task, bound_config, client)
-                except Exception as e:
-                    add_log("WARNING", f"检查新增 {new_plancode} 可用性失败: {str(e)}", "config_sniper")
-    except Exception as e:
-        add_log("WARNING", f"检查新增 planCode 失败: {str(e)}", "config_sniper")
-    
-    # 遍历所有配置匹配的 API2 planCode，检查可用性并加入队列
+    # 遍历所有已知型号，检查可用性并加入队列（一次性）
     has_queued = False
     for api2_plancode in matched_api2_plancodes:
         try:
