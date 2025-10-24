@@ -62,6 +62,7 @@ HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
 SERVERS_FILE = os.path.join(DATA_DIR, "servers.json")
 SUBSCRIPTIONS_FILE = os.path.join(DATA_DIR, "subscriptions.json")
 CONFIG_SNIPER_FILE = os.path.join(DATA_DIR, "config_sniper_tasks.json")
+VPS_SUBSCRIPTIONS_FILE = os.path.join(DATA_DIR, "vps_subscriptions.json")
 
 config = {
     "appKey": "",
@@ -103,9 +104,15 @@ deleted_task_ids = set()
 config_sniper_tasks = []
 config_sniper_running = False
 
+# VPS 监控相关
+vps_subscriptions = []
+vps_monitor_running = False
+vps_monitor_thread = None
+vps_check_interval = 60  # VPS检查间隔（秒）
+
 # Load data from files if they exist
 def load_data():
-    global config, logs, queue, purchase_history, server_plans, stats, config_sniper_tasks
+    global config, logs, queue, purchase_history, server_plans, stats, config_sniper_tasks, vps_subscriptions, vps_check_interval
     
     if os.path.exists(CONFIG_FILE):
         try:
@@ -201,6 +208,22 @@ def load_data():
         except json.JSONDecodeError:
             print(f"警告: {CONFIG_SNIPER_FILE}文件格式不正确")
     
+    # 加载VPS订阅数据
+    if os.path.exists(VPS_SUBSCRIPTIONS_FILE):
+        try:
+            with open(VPS_SUBSCRIPTIONS_FILE, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if content:
+                    data = json.loads(content)
+                    vps_subscriptions.clear()
+                    vps_subscriptions.extend(data.get('subscriptions', []))
+                    vps_check_interval = data.get('check_interval', 60)
+                    print(f"已加载 {len(vps_subscriptions)} 个VPS订阅")
+                else:
+                    print(f"警告: {VPS_SUBSCRIPTIONS_FILE}文件为空")
+        except json.JSONDecodeError:
+            print(f"警告: {VPS_SUBSCRIPTIONS_FILE}文件格式不正确")
+    
     # Update stats
     update_stats()
     
@@ -246,6 +269,19 @@ def save_config_sniper_tasks():
         logging.info(f"已保存 {len(config_sniper_tasks)} 个配置绑定狙击任务")
     except Exception as e:
         logging.error(f"保存配置狙击任务时出错: {str(e)}")
+
+# 保存VPS订阅数据
+def save_vps_subscriptions():
+    try:
+        data = {
+            'subscriptions': vps_subscriptions,
+            'check_interval': vps_check_interval
+        }
+        with open(VPS_SUBSCRIPTIONS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        logging.info(f"已保存 {len(vps_subscriptions)} 个VPS订阅")
+    except Exception as e:
+        logging.error(f"保存VPS订阅时出错: {str(e)}")
 
 # 日志缓冲区：批量写入以提高性能
 log_write_counter = 0
@@ -3060,6 +3096,553 @@ def check_config_sniper_task(task_id):
         
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
+
+# ==================== VPS 监控相关功能 ====================
+
+def check_vps_datacenter_availability(plan_code, ovh_subsidiary="IE"):
+    """
+    检查VPS套餐的数据中心可用性
+    
+    Args:
+        plan_code: VPS套餐代码，如 vps-2025-model1
+        ovh_subsidiary: OVH子公司代码，默认IE
+    
+    Returns:
+        dict: 包含数据中心可用性信息的字典
+    """
+    try:
+        url = f"https://eu.api.ovh.com/v1/vps/order/rule/datacenter"
+        params = {
+            'ovhSubsidiary': ovh_subsidiary,
+            'planCode': plan_code
+        }
+        headers = {'accept': 'application/json'}
+        
+        add_log("INFO", f"检查VPS可用性: {plan_code} (subsidiary: {ovh_subsidiary})", "vps_monitor")
+        
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            add_log("INFO", f"VPS {plan_code} 数据中心信息获取成功", "vps_monitor")
+            return data
+        else:
+            add_log("ERROR", f"获取VPS数据中心信息失败: HTTP {response.status_code}", "vps_monitor")
+            return None
+            
+    except Exception as e:
+        add_log("ERROR", f"检查VPS可用性时出错: {str(e)}", "vps_monitor")
+        return None
+
+def send_vps_summary_notification(plan_code, datacenters_list, change_type):
+    """
+    发送VPS库存变化汇总通知（多个数据中心）
+    
+    Args:
+        plan_code: VPS套餐代码
+        datacenters_list: 数据中心列表 [{'name': '', 'code': '', 'status': '', 'days': 0}, ...]
+        change_type: 变化类型 (available/unavailable/initial)
+    """
+    try:
+        tg_token = config.get('tgToken')
+        tg_chat_id = config.get('tgChatId')
+        
+        if not tg_token or not tg_chat_id or not datacenters_list:
+            return False
+        
+        # 状态翻译
+        status_map = {
+            'available': '现货',
+            'out-of-stock': '无货',
+            'out-of-stock-preorder-allowed': '缺货（可预订）',
+            'unavailable': '不可用',
+            'unknown': '未知'
+        }
+        
+        # VPS型号翻译
+        vps_model_map = {
+            'vps-2025-model1': 'VPS-1',
+            'vps-2025-model2': 'VPS-2',
+            'vps-2025-model3': 'VPS-3',
+            'vps-2025-model4': 'VPS-4',
+            'vps-2025-model5': 'VPS-5',
+            'vps-2025-model6': 'VPS-6',
+        }
+        plan_code_display = vps_model_map.get(plan_code, plan_code)
+        
+        # 标题和emoji
+        if change_type == "initial":
+            emoji = "📊"
+            title = "VPS初始状态"
+        elif change_type == "available":
+            emoji = "🎉"
+            title = "VPS补货通知"
+        else:
+            emoji = "📦"
+            title = "VPS下架通知"
+        
+        # 构建消息
+        message = f"{emoji} {title}\n\n套餐: {plan_code_display}\n"
+        message += f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        
+        # 添加数据中心列表
+        for idx, dc in enumerate(datacenters_list, 1):
+            status_cn = status_map.get(dc['status'], dc['status'])
+            message += f"{idx}. {dc['name']} ({dc['code']})\n"
+            message += f"   状态: {status_cn}"
+            if dc.get('days', 0) > 0:
+                message += f" | 预计交付: {dc['days']}天"
+            message += "\n"
+        
+        # 添加footer
+        if change_type == "available":
+            message += "\n💡 快去抢购吧！"
+        
+        result = send_telegram_msg(message)
+        
+        if result:
+            add_log("INFO", f"✅ VPS汇总通知发送成功: {plan_code} ({len(datacenters_list)}个机房)", "vps_monitor")
+        else:
+            add_log("WARNING", f"⚠️ VPS汇总通知发送失败: {plan_code}", "vps_monitor")
+        
+        return result
+        
+    except Exception as e:
+        add_log("ERROR", f"发送VPS汇总通知时出错: {str(e)}", "vps_monitor")
+        return False
+
+def send_vps_notification(plan_code, datacenter_info, change_type):
+    """
+    发送VPS库存变化通知
+    
+    Args:
+        plan_code: VPS套餐代码
+        datacenter_info: 数据中心信息
+        change_type: 变化类型 (available/unavailable)
+    """
+    try:
+        tg_token = config.get('tgToken')
+        tg_chat_id = config.get('tgChatId')
+        
+        if not tg_token or not tg_chat_id:
+            add_log("WARNING", "Telegram配置不完整，无法发送通知", "vps_monitor")
+            return False
+        
+        dc_name = datacenter_info.get('datacenter', 'Unknown')
+        dc_code = datacenter_info.get('code', 'Unknown')
+        status = datacenter_info.get('status', 'unknown')
+        days_before_delivery = datacenter_info.get('daysBeforeDelivery', 0)
+        
+        # 状态翻译成中文
+        status_map = {
+            'available': '现货',
+            'out-of-stock': '无货',
+            'out-of-stock-preorder-allowed': '缺货（可预订）',
+            'unavailable': '不可用',
+            'unknown': '未知'
+        }
+        status_cn = status_map.get(status, status)
+        
+        # VPS型号翻译成友好名称
+        vps_model_map = {
+            'vps-2025-model1': 'VPS-1',
+            'vps-2025-model2': 'VPS-2',
+            'vps-2025-model3': 'VPS-3',
+            'vps-2025-model4': 'VPS-4',
+            'vps-2025-model5': 'VPS-5',
+            'vps-2025-model6': 'VPS-6',
+        }
+        plan_code_display = vps_model_map.get(plan_code, plan_code)
+        
+        if change_type == "available":
+            emoji = "🎉"
+            title = "VPS补货通知"
+            status_text = f"状态: {status_cn}"
+            if days_before_delivery > 0:
+                status_text += f"\n预计交付: {days_before_delivery}天"
+            footer = "💡 快去抢购吧！"
+        else:
+            emoji = "📦"
+            title = "VPS下架通知"
+            status_text = f"状态: {status_cn}"
+            footer = ""
+        
+        message = (
+            f"{emoji} {title}\n\n"
+            f"套餐: {plan_code_display}\n"
+            f"数据中心: {dc_name} ({dc_code})\n"
+            f"{status_text}\n"
+            f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        
+        if footer:
+            message += f"\n\n{footer}"
+        
+        result = send_telegram_msg(message)
+        
+        if result:
+            add_log("INFO", f"✅ VPS通知发送成功: {plan_code}@{dc_name}", "vps_monitor")
+        else:
+            add_log("WARNING", f"⚠️ VPS通知发送失败: {plan_code}@{dc_name}", "vps_monitor")
+        
+        return result
+        
+    except Exception as e:
+        add_log("ERROR", f"发送VPS通知时出错: {str(e)}", "vps_monitor")
+        return False
+
+def vps_monitor_loop():
+    """VPS监控主循环"""
+    global vps_monitor_running
+    
+    add_log("INFO", "VPS监控循环已启动", "vps_monitor")
+    
+    while vps_monitor_running:
+        try:
+            if vps_subscriptions:
+                add_log("INFO", f"开始检查 {len(vps_subscriptions)} 个VPS订阅...", "vps_monitor")
+                
+                for subscription in vps_subscriptions:
+                    if not vps_monitor_running:
+                        break
+                    
+                    plan_code = subscription.get('planCode')
+                    ovh_subsidiary = subscription.get('ovhSubsidiary', 'IE')
+                    notify_available = subscription.get('notifyAvailable', True)
+                    notify_unavailable = subscription.get('notifyUnavailable', False)
+                    monitored_datacenters = subscription.get('datacenters', [])
+                    
+                    # 获取当前可用性
+                    current_data = check_vps_datacenter_availability(plan_code, ovh_subsidiary)
+                    
+                    if not current_data or 'datacenters' not in current_data:
+                        add_log("WARNING", f"无法获取VPS {plan_code} 的数据中心信息", "vps_monitor")
+                        continue
+                    
+                    last_status = subscription.get('lastStatus', {})
+                    current_datacenters = current_data['datacenters']
+                    
+                    # 收集变化的数据中心
+                    initial_available = []  # 首次检查有货
+                    new_available = []  # 从无货变有货
+                    new_unavailable = []  # 从有货变无货
+                    is_first_check_overall = len(last_status) == 0
+                    
+                    # 检查每个数据中心的变化
+                    for dc in current_datacenters:
+                        dc_code = dc.get('code')
+                        dc_name = dc.get('datacenter')
+                        current_status = dc.get('status')
+                        days = dc.get('daysBeforeDelivery', 0)
+                        
+                        # 如果指定了数据中心列表，只监控列表中的
+                        if monitored_datacenters and dc_code not in monitored_datacenters:
+                            continue
+                        
+                        # 获取上次状态
+                        old_status = last_status.get(dc_code)
+                        is_first_check = old_status is None
+                        
+                        # 首次检查：收集所有数据中心状态
+                        if is_first_check:
+                            initial_available.append({
+                                'name': dc_name,
+                                'code': dc_code,
+                                'status': current_status,
+                                'days': days
+                            })
+                            # 添加到历史记录
+                            if current_status not in ['out-of-stock', 'out-of-stock-preorder-allowed']:
+                                if 'history' not in subscription:
+                                    subscription['history'] = []
+                                subscription['history'].append({
+                                    'timestamp': datetime.now().isoformat(),
+                                    'datacenter': dc_name,
+                                    'datacenterCode': dc_code,
+                                    'status': current_status,
+                                    'changeType': 'available',
+                                    'oldStatus': None
+                                })
+                        
+                        # 非首次检查：监控状态变化
+                        else:
+                            # 从无货变有货
+                            if old_status in ['out-of-stock', 'out-of-stock-preorder-allowed'] and \
+                               current_status not in ['out-of-stock', 'out-of-stock-preorder-allowed']:
+                                new_available.append({
+                                    'name': dc_name,
+                                    'code': dc_code,
+                                    'status': current_status,
+                                    'days': days
+                                })
+                                # 添加到历史记录
+                                if 'history' not in subscription:
+                                    subscription['history'] = []
+                                subscription['history'].append({
+                                    'timestamp': datetime.now().isoformat(),
+                                    'datacenter': dc_name,
+                                    'datacenterCode': dc_code,
+                                    'status': current_status,
+                                    'changeType': 'available',
+                                    'oldStatus': old_status
+                                })
+                            
+                            # 从有货变无货
+                            elif old_status not in ['out-of-stock', 'out-of-stock-preorder-allowed'] and \
+                                 current_status in ['out-of-stock', 'out-of-stock-preorder-allowed']:
+                                new_unavailable.append({
+                                    'name': dc_name,
+                                    'code': dc_code,
+                                    'status': current_status,
+                                    'days': days
+                                })
+                                # 添加到历史记录
+                                if 'history' not in subscription:
+                                    subscription['history'] = []
+                                subscription['history'].append({
+                                    'timestamp': datetime.now().isoformat(),
+                                    'datacenter': dc_name,
+                                    'datacenterCode': dc_code,
+                                    'status': current_status,
+                                    'changeType': 'unavailable',
+                                    'oldStatus': old_status
+                                })
+                        
+                        # 更新最后状态
+                        last_status[dc_code] = current_status
+                    
+                    # 发送汇总通知
+                    if is_first_check_overall and initial_available:
+                        # 首次检查：发送初始状态汇总
+                        if notify_available:
+                            add_log("INFO", f"VPS {plan_code} 初始状态检查完成，{len(initial_available)}个数据中心", "vps_monitor")
+                            send_vps_summary_notification(plan_code, initial_available, 'initial')
+                    else:
+                        # 后续检查：发送补货汇总
+                        if new_available and notify_available:
+                            add_log("INFO", f"VPS {plan_code} 补货：{len(new_available)}个数据中心", "vps_monitor")
+                            send_vps_summary_notification(plan_code, new_available, 'available')
+                        
+                        # 发送下架汇总
+                        if new_unavailable and notify_unavailable:
+                            add_log("INFO", f"VPS {plan_code} 下架：{len(new_unavailable)}个数据中心", "vps_monitor")
+                            send_vps_summary_notification(plan_code, new_unavailable, 'unavailable')
+                    
+                    # 更新订阅的最后状态
+                    subscription['lastStatus'] = last_status
+                    
+                    # 限制历史记录数量
+                    if 'history' in subscription and len(subscription['history']) > 100:
+                        subscription['history'] = subscription['history'][-100:]
+                    
+                    time.sleep(1)  # 避免请求过快
+                
+                # 保存更新后的订阅数据
+                save_vps_subscriptions()
+            else:
+                add_log("INFO", "当前无VPS订阅，跳过检查", "vps_monitor")
+            
+        except Exception as e:
+            add_log("ERROR", f"VPS监控循环出错: {str(e)}", "vps_monitor")
+            add_log("ERROR", f"错误详情: {traceback.format_exc()}", "vps_monitor")
+        
+        # 等待下次检查
+        if vps_monitor_running:
+            add_log("INFO", f"等待 {vps_check_interval} 秒后进行下次VPS检查...", "vps_monitor")
+            for _ in range(vps_check_interval):
+                if not vps_monitor_running:
+                    break
+                time.sleep(1)
+    
+    add_log("INFO", "VPS监控循环已停止", "vps_monitor")
+
+# ==================== VPS 监控 API 接口 ====================
+
+@app.route('/api/vps-monitor/subscriptions', methods=['GET'])
+def get_vps_subscriptions():
+    """获取VPS订阅列表"""
+    return jsonify(vps_subscriptions)
+
+@app.route('/api/vps-monitor/subscriptions', methods=['POST'])
+def add_vps_subscription():
+    """添加VPS订阅"""
+    global vps_subscriptions
+    
+    data = request.json
+    plan_code = data.get('planCode')
+    ovh_subsidiary = data.get('ovhSubsidiary', 'IE')
+    datacenters = data.get('datacenters', [])
+    monitor_linux = data.get('monitorLinux', True)
+    monitor_windows = data.get('monitorWindows', False)
+    notify_available = data.get('notifyAvailable', True)
+    notify_unavailable = data.get('notifyUnavailable', False)
+    
+    if not plan_code:
+        return jsonify({"status": "error", "message": "缺少planCode参数"}), 400
+    
+    # 检查是否已存在
+    existing = next((s for s in vps_subscriptions if s['planCode'] == plan_code and s['ovhSubsidiary'] == ovh_subsidiary), None)
+    if existing:
+        return jsonify({"status": "error", "message": "该VPS套餐已订阅"}), 400
+    
+    subscription = {
+        'id': str(uuid.uuid4()),
+        'planCode': plan_code,
+        'ovhSubsidiary': ovh_subsidiary,
+        'datacenters': datacenters,
+        'monitorLinux': monitor_linux,
+        'monitorWindows': monitor_windows,
+        'notifyAvailable': notify_available,
+        'notifyUnavailable': notify_unavailable,
+        'lastStatus': {},
+        'history': [],
+        'createdAt': datetime.now().isoformat()
+    }
+    
+    vps_subscriptions.append(subscription)
+    save_vps_subscriptions()
+    
+    add_log("INFO", f"添加VPS订阅: {plan_code} (subsidiary: {ovh_subsidiary})", "vps_monitor")
+    
+    # 自动启动监控（如果还未启动）
+    global vps_monitor_running, vps_monitor_thread
+    if not vps_monitor_running:
+        vps_monitor_running = True
+        vps_monitor_thread = threading.Thread(target=vps_monitor_loop, daemon=True)
+        vps_monitor_thread.start()
+        add_log("INFO", f"自动启动VPS监控 (检查间隔: {vps_check_interval}秒)", "vps_monitor")
+    
+    return jsonify({"status": "success", "message": f"已订阅 {plan_code}", "subscription": subscription})
+
+@app.route('/api/vps-monitor/subscriptions/<subscription_id>', methods=['DELETE'])
+def remove_vps_subscription(subscription_id):
+    """删除VPS订阅"""
+    global vps_subscriptions, vps_monitor_running
+    
+    original_count = len(vps_subscriptions)
+    vps_subscriptions = [s for s in vps_subscriptions if s['id'] != subscription_id]
+    
+    if len(vps_subscriptions) < original_count:
+        save_vps_subscriptions()
+        add_log("INFO", f"删除VPS订阅: {subscription_id}", "vps_monitor")
+        
+        # 如果删除后没有订阅了，自动停止监控
+        if len(vps_subscriptions) == 0 and vps_monitor_running:
+            vps_monitor_running = False
+            add_log("INFO", "所有订阅已删除，自动停止VPS监控", "vps_monitor")
+        
+        return jsonify({"status": "success", "message": "订阅已删除"})
+    else:
+        return jsonify({"status": "error", "message": "订阅不存在"}), 404
+
+@app.route('/api/vps-monitor/subscriptions/clear', methods=['DELETE'])
+def clear_vps_subscriptions():
+    """清空所有VPS订阅"""
+    global vps_subscriptions, vps_monitor_running
+    
+    count = len(vps_subscriptions)
+    vps_subscriptions.clear()
+    save_vps_subscriptions()
+    
+    add_log("INFO", f"清空所有VPS订阅 ({count} 项)", "vps_monitor")
+    
+    # 清空订阅后自动停止监控
+    if vps_monitor_running:
+        vps_monitor_running = False
+        add_log("INFO", "所有订阅已清空，自动停止VPS监控", "vps_monitor")
+    
+    return jsonify({"status": "success", "count": count, "message": f"已清空 {count} 个订阅"})
+
+@app.route('/api/vps-monitor/subscriptions/<subscription_id>/history', methods=['GET'])
+def get_vps_subscription_history(subscription_id):
+    """获取VPS订阅的历史记录"""
+    subscription = next((s for s in vps_subscriptions if s['id'] == subscription_id), None)
+    
+    if not subscription:
+        return jsonify({"status": "error", "message": "订阅不存在"}), 404
+    
+    history = subscription.get('history', [])
+    # 返回倒序历史记录（最新的在前）
+    reversed_history = list(reversed(history))
+    
+    return jsonify({
+        "planCode": subscription['planCode'],
+        "history": reversed_history
+    })
+
+@app.route('/api/vps-monitor/start', methods=['POST'])
+def start_vps_monitor():
+    """启动VPS监控"""
+    global vps_monitor_running, vps_monitor_thread
+    
+    if vps_monitor_running:
+        return jsonify({"status": "info", "message": "VPS监控已在运行中"})
+    
+    vps_monitor_running = True
+    vps_monitor_thread = threading.Thread(target=vps_monitor_loop, daemon=True)
+    vps_monitor_thread.start()
+    
+    add_log("INFO", f"VPS监控已启动 (检查间隔: {vps_check_interval}秒)", "vps_monitor")
+    return jsonify({"status": "success", "message": "VPS监控已启动"})
+
+@app.route('/api/vps-monitor/stop', methods=['POST'])
+def stop_vps_monitor():
+    """停止VPS监控"""
+    global vps_monitor_running
+    
+    if not vps_monitor_running:
+        return jsonify({"status": "info", "message": "VPS监控未运行"})
+    
+    vps_monitor_running = False
+    add_log("INFO", "正在停止VPS监控...", "vps_monitor")
+    
+    return jsonify({"status": "success", "message": "VPS监控已停止"})
+
+@app.route('/api/vps-monitor/status', methods=['GET'])
+def get_vps_monitor_status():
+    """获取VPS监控状态"""
+    status = {
+        'running': vps_monitor_running,
+        'subscriptions_count': len(vps_subscriptions),
+        'check_interval': vps_check_interval
+    }
+    return jsonify(status)
+
+@app.route('/api/vps-monitor/interval', methods=['PUT'])
+def set_vps_monitor_interval():
+    """设置VPS监控间隔"""
+    global vps_check_interval
+    
+    data = request.json
+    interval = data.get('interval')
+    
+    if not interval or interval < 60:
+        return jsonify({"status": "error", "message": "间隔不能小于60秒"}), 400
+    
+    vps_check_interval = interval
+    save_vps_subscriptions()
+    
+    add_log("INFO", f"VPS检查间隔已设置为 {interval} 秒", "vps_monitor")
+    return jsonify({"status": "success", "message": f"检查间隔已设置为 {interval} 秒"})
+
+@app.route('/api/vps-monitor/check/<plan_code>', methods=['POST'])
+def manual_check_vps(plan_code):
+    """手动检查VPS可用性"""
+    data = request.json or {}
+    ovh_subsidiary = data.get('ovhSubsidiary', 'IE')
+    
+    result = check_vps_datacenter_availability(plan_code, ovh_subsidiary)
+    
+    if result:
+        return jsonify({
+            "status": "success",
+            "data": result
+        })
+    else:
+        return jsonify({
+            "status": "error",
+            "message": "获取VPS数据中心信息失败"
+        }), 500
 
 if __name__ == '__main__':
     # 确保所有文件都存在

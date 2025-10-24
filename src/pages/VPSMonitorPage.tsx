@@ -2,40 +2,44 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '@/utils/apiClient';
 import { toast } from 'sonner';
-import { Bell, BellOff, Plus, Trash2, Settings, Clock, RefreshCw, History, ChevronDown, ChevronUp } from 'lucide-react';
+import { Bell, BellOff, Plus, Trash2, Settings, Clock, RefreshCw, History, ChevronDown, ChevronUp, Server } from 'lucide-react';
 import { useAPI } from '@/context/APIContext';
 
-interface Subscription {
+interface VPSSubscription {
+  id: string;
   planCode: string;
+  ovhSubsidiary: string;
   datacenters: string[];
+  monitorLinux: boolean;
+  monitorWindows: boolean;
   notifyAvailable: boolean;
   notifyUnavailable: boolean;
-  lastStatus: Record<string, string>;
+  lastStatus: Record<string, any>;
+  history?: HistoryEntry[];
   createdAt: string;
 }
 
 interface MonitorStatus {
   running: boolean;
   subscriptions_count: number;
-  known_servers_count: number;
   check_interval: number;
 }
 
 interface HistoryEntry {
   timestamp: string;
   datacenter: string;
+  datacenterCode: string;
   status: string;
   changeType: string;
   oldStatus: string | null;
 }
 
-const MonitorPage = () => {
+const VPSMonitorPage = () => {
   const { isAuthenticated } = useAPI();
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [subscriptions, setSubscriptions] = useState<VPSSubscription[]>([]);
   const [monitorStatus, setMonitorStatus] = useState<MonitorStatus>({
     running: false,
     subscriptions_count: 0,
-    known_servers_count: 0,
     check_interval: 60
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -43,9 +47,20 @@ const MonitorPage = () => {
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
   const [historyData, setHistoryData] = useState<Record<string, HistoryEntry[]>>({});
   
+  // VPS型号选项
+  const vpsModels = [
+    { value: 'vps-2025-model1', label: 'VPS-1' },
+    { value: 'vps-2025-model2', label: 'VPS-2' },
+    { value: 'vps-2025-model3', label: 'VPS-3' },
+    { value: 'vps-2025-model4', label: 'VPS-4' },
+    { value: 'vps-2025-model5', label: 'VPS-5' },
+    { value: 'vps-2025-model6', label: 'VPS-6' },
+  ];
+
   // 添加订阅表单
   const [formData, setFormData] = useState({
-    planCode: '',
+    vpsModel: 'vps-2025-model1',
+    ovhSubsidiary: 'IE',
     datacenters: '',
     notifyAvailable: true,
     notifyUnavailable: false
@@ -54,21 +69,21 @@ const MonitorPage = () => {
   // 加载订阅列表
   const loadSubscriptions = async () => {
     try {
-      const response = await api.get('/monitor/subscriptions');
+      const response = await api.get('/vps-monitor/subscriptions');
       setSubscriptions(response.data);
     } catch (error) {
-      console.error('加载订阅失败:', error);
-      toast.error('加载订阅失败');
+      console.error('加载VPS订阅失败:', error);
+      toast.error('加载VPS订阅失败');
     }
   };
 
   // 加载监控状态
   const loadMonitorStatus = async () => {
     try {
-      const response = await api.get('/monitor/status');
+      const response = await api.get('/vps-monitor/status');
       setMonitorStatus(response.data);
     } catch (error) {
-      console.error('加载监控状态失败:', error);
+      console.error('加载VPS监控状态失败:', error);
     }
   };
 
@@ -76,27 +91,30 @@ const MonitorPage = () => {
   const handleAddSubscription = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.planCode.trim()) {
-      toast.error('请输入服务器型号');
-      return;
-    }
-    
     try {
       const datacenters = formData.datacenters
         .split(',')
         .map(dc => dc.trim())
         .filter(dc => dc);
       
-      await api.post('/monitor/subscriptions', {
-        planCode: formData.planCode.trim(),
+      // 获取选中的VPS型号的显示名称
+      const selectedModel = vpsModels.find(m => m.value === formData.vpsModel);
+      const modelLabel = selectedModel?.label || formData.vpsModel;
+      
+      await api.post('/vps-monitor/subscriptions', {
+        planCode: formData.vpsModel,
+        ovhSubsidiary: formData.ovhSubsidiary,
         datacenters: datacenters.length > 0 ? datacenters : [],
+        monitorLinux: true,  // 自动监控Linux
+        monitorWindows: true,  // 自动监控Windows
         notifyAvailable: formData.notifyAvailable,
         notifyUnavailable: formData.notifyUnavailable
       });
       
-      toast.success(`已订阅 ${formData.planCode}`);
+      toast.success(`已订阅 ${modelLabel}`);
       setFormData({
-        planCode: '',
+        vpsModel: 'vps-2025-model1',
+        ovhSubsidiary: 'IE',
         datacenters: '',
         notifyAvailable: true,
         notifyUnavailable: false
@@ -104,19 +122,20 @@ const MonitorPage = () => {
       setShowAddForm(false);
       loadSubscriptions();
       loadMonitorStatus();
-    } catch (error) {
-      toast.error('订阅失败');
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || '订阅失败';
+      toast.error(errorMsg);
     }
   };
 
   // 删除订阅
-  const handleRemoveSubscription = async (planCode: string) => {
+  const handleRemoveSubscription = async (id: string, planCode: string) => {
     if (!window.confirm(`确定要取消订阅 ${planCode} 吗？`)) {
       return;
     }
     
     try {
-      await api.delete(`/monitor/subscriptions/${planCode}`);
+      await api.delete(`/vps-monitor/subscriptions/${id}`);
       toast.success(`已取消订阅 ${planCode}`);
       loadSubscriptions();
       loadMonitorStatus();
@@ -127,13 +146,13 @@ const MonitorPage = () => {
 
   // 清空所有订阅
   const handleClearAll = async () => {
-    if (!window.confirm('确定要清空所有订阅吗？此操作不可撤销。')) {
+    if (!window.confirm('确定要清空所有VPS订阅吗？此操作不可撤销。')) {
       return;
     }
     
     try {
-      const response = await api.delete('/monitor/subscriptions/clear');
-      toast.success(`已清空 ${response.data.count} 个订阅`);
+      const response = await api.delete('/vps-monitor/subscriptions/clear');
+      toast.success(`已清空 ${response.data.count} 个VPS订阅`);
       loadSubscriptions();
       loadMonitorStatus();
     } catch (error) {
@@ -141,14 +160,20 @@ const MonitorPage = () => {
     }
   };
 
-  // 测试Telegram通知
-  const testNotification = async () => {
+  // 启动/停止监控
+  const toggleMonitor = async () => {
     setIsLoading(true);
     try {
-      const response = await api.post('/monitor/test-notification');
-      toast.success(response.data.message);
+      if (monitorStatus.running) {
+        await api.post('/vps-monitor/stop');
+        toast.success('VPS监控已停止');
+      } else {
+        await api.post('/vps-monitor/start');
+        toast.success('VPS监控已启动');
+      }
+      loadMonitorStatus();
     } catch (error: any) {
-      const errorMsg = error.response?.data?.message || '测试失败';
+      const errorMsg = error.response?.data?.message || '操作失败';
       toast.error(errorMsg);
     } finally {
       setIsLoading(false);
@@ -156,12 +181,12 @@ const MonitorPage = () => {
   };
 
   // 获取订阅历史记录
-  const loadHistory = async (planCode: string) => {
+  const loadHistory = async (subscriptionId: string) => {
     try {
-      const response = await api.get(`/monitor/subscriptions/${planCode}/history`);
+      const response = await api.get(`/vps-monitor/subscriptions/${subscriptionId}/history`);
       setHistoryData(prev => ({
         ...prev,
-        [planCode]: response.data.history
+        [subscriptionId]: response.data.history
       }));
     } catch (error) {
       toast.error('加载历史记录失败');
@@ -169,13 +194,13 @@ const MonitorPage = () => {
   };
 
   // 切换历史记录展开/收起
-  const toggleHistory = async (planCode: string) => {
-    if (expandedHistory === planCode) {
+  const toggleHistory = async (subscriptionId: string) => {
+    if (expandedHistory === subscriptionId) {
       setExpandedHistory(null);
     } else {
-      setExpandedHistory(planCode);
-      if (!historyData[planCode]) {
-        await loadHistory(planCode);
+      setExpandedHistory(subscriptionId);
+      if (!historyData[subscriptionId]) {
+        await loadHistory(subscriptionId);
       }
     }
   };
@@ -201,8 +226,8 @@ const MonitorPage = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <h1 className="text-3xl font-bold mb-1 cyber-glow-text">服务器监控</h1>
-        <p className="text-cyber-muted mb-6">自动监控服务器可用性变化并推送通知</p>
+        <h1 className="text-3xl font-bold mb-1 cyber-glow-text">VPS补货通知</h1>
+        <p className="text-cyber-muted mb-6">选择VPS型号（VPS-1至VPS-6），自动监控所有数据中心的库存变化</p>
       </motion.div>
 
       {/* 监控状态卡片 */}
@@ -219,7 +244,7 @@ const MonitorPage = () => {
               </div>
             )}
             <div>
-              <h3 className="text-lg font-semibold">监控状态</h3>
+              <h3 className="text-lg font-semibold">VPS监控状态</h3>
               <p className="text-sm text-cyber-muted">
                 {monitorStatus.running ? (
                   <span className="text-green-400">● 运行中</span>
@@ -230,57 +255,57 @@ const MonitorPage = () => {
             </div>
           </div>
           
-          <button
-            onClick={() => {
-              loadSubscriptions();
-              loadMonitorStatus();
-            }}
-            className="px-4 py-2 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 rounded-md transition-all flex items-center gap-2 text-sm font-medium shadow-sm hover:shadow-md"
-          >
-            <RefreshCw size={16} />
-            刷新
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                loadSubscriptions();
+                loadMonitorStatus();
+              }}
+              className="px-4 py-2 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 rounded-md transition-all flex items-center gap-2 text-sm font-medium shadow-sm hover:shadow-md"
+            >
+              <RefreshCw size={16} />
+              刷新
+            </button>
+            <button
+              onClick={toggleMonitor}
+              disabled={isLoading}
+              className={`px-4 py-2 ${
+                monitorStatus.running 
+                  ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border-red-500/40 hover:border-red-500/60' 
+                  : 'bg-green-500/20 hover:bg-green-500/30 text-green-400 border-green-500/40 hover:border-green-500/60'
+              } border rounded-md transition-all flex items-center gap-2 text-sm font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              {monitorStatus.running ? <BellOff size={16} /> : <Bell size={16} />}
+              {monitorStatus.running ? '停止监控' : '启动监控'}
+            </button>
+          </div>
         </div>
 
         {/* 统计信息 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-cyber-grid/10 p-3 rounded border border-cyber-accent/20">
-            <p className="text-xs text-cyber-muted mb-1">订阅数</p>
+            <p className="text-xs text-cyber-muted mb-1">VPS订阅数</p>
             <p className="text-2xl font-bold text-cyber-accent">{monitorStatus.subscriptions_count}</p>
           </div>
           <div className="bg-cyber-grid/10 p-3 rounded border border-cyber-accent/20">
             <p className="text-xs text-cyber-muted mb-1">检查间隔</p>
             <p className="text-2xl font-bold text-cyber-accent">{monitorStatus.check_interval}s</p>
           </div>
-          <div className="bg-cyber-grid/10 p-3 rounded border border-cyber-accent/20">
-            <p className="text-xs text-cyber-muted mb-1">已知服务器</p>
-            <p className="text-2xl font-bold text-cyber-accent">{monitorStatus.known_servers_count}</p>
-          </div>
         </div>
       </div>
 
       {/* 提醒说明 */}
       <div className="bg-cyber-accent/10 border border-cyber-accent/30 rounded p-4">
-        <div className="flex justify-between items-start mb-2">
-          <h4 className="text-cyber-accent font-medium flex items-center gap-2">
-            <Clock size={18} />
-            监控说明
-          </h4>
-          <button
-            onClick={testNotification}
-            disabled={isLoading}
-            className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/40 hover:border-blue-500/60 rounded-md transition-all flex items-center gap-1.5 text-sm font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Bell size={14} />
-            测试通知
-          </button>
-        </div>
+        <h4 className="text-cyber-accent font-medium flex items-center gap-2 mb-2">
+          <Clock size={18} />
+          监控说明
+        </h4>
         <ul className="text-sm text-cyber-muted space-y-1">
-          <li>• 监控器每 {monitorStatus.check_interval} 秒检查一次订阅的服务器可用性</li>
-          <li>• 当服务器从无货变有货时，会发送 Telegram 通知</li>
+          <li>• 监控器每 {monitorStatus.check_interval} 秒检查一次VPS套餐的库存状态</li>
+          <li>• 选择VPS型号（VPS-1 至 VPS-6），监控该型号在所有数据中心的库存</li>
+          <li>• 支持监控特定数据中心，或留空监控所有数据中心</li>
+          <li>• 当VPS从无货变有货时，会立即发送 Telegram 通知</li>
           <li>• 确保已在设置页面配置 Telegram Token 和 Chat ID</li>
-          <li>• 可以指定监控特定数据中心，或留空监控所有数据中心</li>
-          <li>• 点击右上角"测试通知"按钮可以立即测试 Telegram 配置</li>
         </ul>
       </div>
 
@@ -288,8 +313,8 @@ const MonitorPage = () => {
       <div className="cyber-panel p-4">
         <div className="flex justify-between items-center mb-4">
           <h4 className="font-semibold flex items-center gap-2">
-            <Settings size={18} />
-            订阅列表
+            <Server size={18} />
+            VPS订阅列表
           </h4>
           <div className="flex gap-2">
             {subscriptions.length > 0 && (
@@ -319,48 +344,76 @@ const MonitorPage = () => {
             className="mb-4 p-4 bg-cyber-grid/10 rounded border border-cyber-accent/20"
           >
             <form onSubmit={handleAddSubscription} className="space-y-3">
-              <div>
-                <label className="block text-sm text-cyber-muted mb-1">服务器型号 *</label>
-                <input
-                  type="text"
-                  value={formData.planCode}
-                  onChange={(e) => setFormData({...formData, planCode: e.target.value})}
-                  placeholder="例如: 24ska01"
-                  className="cyber-input w-full"
-                  required
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-cyber-muted mb-1">VPS型号 *</label>
+                  <select
+                    value={formData.vpsModel}
+                    onChange={(e) => setFormData({...formData, vpsModel: e.target.value})}
+                    className="cyber-input w-full"
+                    required
+                  >
+                    {vpsModels.map(model => (
+                      <option key={model.value} value={model.value}>
+                        {model.label} ({model.value})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-cyber-muted mb-1">OVH子公司</label>
+                  <select
+                    value={formData.ovhSubsidiary}
+                    onChange={(e) => setFormData({...formData, ovhSubsidiary: e.target.value})}
+                    className="cyber-input w-full"
+                  >
+                    <option value="IE">IE (爱尔兰)</option>
+                    <option value="FR">FR (法国)</option>
+                    <option value="GB">GB (英国)</option>
+                    <option value="DE">DE (德国)</option>
+                    <option value="ES">ES (西班牙)</option>
+                    <option value="IT">IT (意大利)</option>
+                    <option value="PL">PL (波兰)</option>
+                    <option value="CA">CA (加拿大)</option>
+                    <option value="US">US (美国)</option>
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="block text-sm text-cyber-muted mb-1">
-                  数据中心（可选，多个用逗号分隔）
+                  数据中心代码（可选，多个用逗号分隔）
                 </label>
                 <input
                   type="text"
                   value={formData.datacenters}
                   onChange={(e) => setFormData({...formData, datacenters: e.target.value})}
-                  placeholder="例如: gra,rbx,sbg 或留空监控所有"
+                  placeholder="例如: eu-west-gra,ca-east-bhs 或留空监控所有"
                   className="cyber-input w-full"
                 />
+                <p className="text-xs text-cyber-muted mt-1">💡 监控该型号在数据中心的整体库存状态</p>
               </div>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.notifyAvailable}
-                    onChange={(e) => setFormData({...formData, notifyAvailable: e.target.checked})}
-                    className="cyber-checkbox"
-                  />
-                  <span className="text-sm">有货时提醒</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.notifyUnavailable}
-                    onChange={(e) => setFormData({...formData, notifyUnavailable: e.target.checked})}
-                    className="cyber-checkbox"
-                  />
-                  <span className="text-sm">无货时提醒</span>
-                </label>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-cyber-accent">通知设置</p>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.notifyAvailable}
+                      onChange={(e) => setFormData({...formData, notifyAvailable: e.target.checked})}
+                      className="cyber-checkbox"
+                    />
+                    <span className="text-sm">有货时提醒</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.notifyUnavailable}
+                      onChange={(e) => setFormData({...formData, notifyUnavailable: e.target.checked})}
+                      className="cyber-checkbox"
+                    />
+                    <span className="text-sm">无货时提醒</span>
+                  </label>
+                </div>
               </div>
               <div className="flex gap-3">
                 <button 
@@ -384,28 +437,35 @@ const MonitorPage = () => {
         {/* 订阅列表 */}
         {subscriptions.length === 0 ? (
           <div className="text-center text-cyber-muted py-12">
-            <Bell size={48} className="mx-auto mb-4 opacity-30" />
-            <p>暂无订阅</p>
-            <p className="text-sm mt-2">点击"添加订阅"按钮开始监控服务器</p>
+            <Server size={48} className="mx-auto mb-4 opacity-30" />
+            <p>暂无VPS订阅</p>
+            <p className="text-sm mt-2">点击"添加订阅"按钮，选择VPS型号开始监控</p>
           </div>
         ) : (
           <div className="space-y-3">
             {subscriptions.map((sub) => (
               <motion.div
-                key={sub.planCode}
+                key={sub.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-cyber-grid/10 rounded border border-cyber-accent/20 hover:border-cyber-accent/40 transition-colors overflow-hidden"
               >
                 <div className="flex justify-between items-start p-3">
                   <div className="flex-1">
-                    <p className="font-medium text-cyber-accent">{sub.planCode}</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-medium text-cyber-accent">
+                        {vpsModels.find(m => m.value === sub.planCode)?.label || sub.planCode}
+                      </p>
+                      <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded">
+                        {sub.ovhSubsidiary}
+                      </span>
+                    </div>
                     <p className="text-xs text-cyber-muted mt-1">
                       {sub.datacenters.length > 0 
                         ? `监控数据中心: ${sub.datacenters.join(', ')}`
                         : '监控所有数据中心'}
                     </p>
-                    <div className="flex gap-2 mt-2">
+                    <div className="flex gap-2 mt-2 flex-wrap">
                       {sub.notifyAvailable && (
                         <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded">
                           有货提醒
@@ -421,14 +481,14 @@ const MonitorPage = () => {
                   
                   <div className="flex gap-2">
                     <button
-                      onClick={() => toggleHistory(sub.planCode)}
+                      onClick={() => toggleHistory(sub.id)}
                       className="p-2 text-cyber-accent hover:bg-cyber-accent/10 rounded transition-colors"
                       title="查看历史记录"
                     >
-                      {expandedHistory === sub.planCode ? <ChevronUp size={16} /> : <History size={16} />}
+                      {expandedHistory === sub.id ? <ChevronUp size={16} /> : <History size={16} />}
                     </button>
                     <button
-                      onClick={() => handleRemoveSubscription(sub.planCode)}
+                      onClick={() => handleRemoveSubscription(sub.id, sub.planCode)}
                       className="p-2 text-red-400 hover:bg-red-500/10 rounded transition-colors"
                       title="删除订阅"
                     >
@@ -438,7 +498,7 @@ const MonitorPage = () => {
                 </div>
 
                 {/* 历史记录展开区域 */}
-                {expandedHistory === sub.planCode && (
+                {expandedHistory === sub.id && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
@@ -451,9 +511,9 @@ const MonitorPage = () => {
                         <span className="text-sm font-medium text-cyber-accent">变化历史</span>
                       </div>
                       
-                      {historyData[sub.planCode]?.length > 0 ? (
+                      {historyData[sub.id]?.length > 0 ? (
                         <div className="space-y-2 max-h-64 overflow-y-auto">
-                          {historyData[sub.planCode].map((entry, index) => (
+                          {historyData[sub.id].map((entry, index) => (
                             <div
                               key={index}
                               className="flex items-start gap-3 p-2 bg-cyber-grid/10 rounded text-xs"
@@ -467,7 +527,7 @@ const MonitorPage = () => {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-medium text-cyber-accent">{entry.datacenter.toUpperCase()}</span>
+                                  <span className="font-medium text-cyber-accent">{entry.datacenter}</span>
                                   <span className={`px-1.5 py-0.5 rounded ${
                                     entry.changeType === 'available' 
                                       ? 'bg-green-500/20 text-green-400' 
@@ -507,4 +567,4 @@ const MonitorPage = () => {
   );
 };
 
-export default MonitorPage;
+export default VPSMonitorPage;
