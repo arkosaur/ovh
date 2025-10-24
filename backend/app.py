@@ -3239,6 +3239,11 @@ def install_os(service_name):
         if data.get('customHostname'):
             install_params['customHostname'] = data['customHostname']
         
+        # 分区方案参数
+        if data.get('partitionSchemeName'):
+            install_params['partitionSchemeName'] = data['partitionSchemeName']
+            add_log("INFO", f"使用自定义分区方案: {data['partitionSchemeName']}", "server_control")
+        
         # 发送安装请求
         result = client.post(
             f'/dedicated/server/{service_name}/install/start',
@@ -3292,6 +3297,257 @@ def get_server_tasks(service_name):
         
     except Exception as e:
         add_log("ERROR", f"获取服务器 {service_name} 任务列表失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ==================== 服务器高级管理功能 ====================
+
+@app.route('/api/server-control/<service_name>/boot', methods=['GET'])
+def get_boot_config(service_name):
+    """获取服务器启动配置"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        server_info = client.get(f'/dedicated/server/{service_name}')
+        boot_id = server_info.get('bootId')
+        boot_list = client.get(f'/dedicated/server/{service_name}/boot')
+        boots = []
+        
+        for bid in boot_list:
+            try:
+                boot_detail = client.get(f'/dedicated/server/{service_name}/boot/{bid}')
+                boots.append({
+                    'id': bid,
+                    'bootType': boot_detail.get('bootType', 'N/A'),
+                    'description': boot_detail.get('description', ''),
+                    'kernel': boot_detail.get('kernel', ''),
+                    'isCurrent': bid == boot_id
+                })
+            except:
+                pass
+        
+        return jsonify({"success": True, "currentBootId": boot_id, "boots": boots})
+    except Exception as e:
+        add_log("ERROR", f"获取服务器 {service_name} 启动配置失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/boot/<int:boot_id>', methods=['PUT'])
+def set_boot_config(service_name, boot_id):
+    """设置服务器启动模式"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        client.put(f'/dedicated/server/{service_name}', bootId=boot_id)
+        add_log("INFO", f"服务器 {service_name} 启动模式已设置为 {boot_id}", "server_control")
+        return jsonify({"success": True, "message": "启动模式已更新，重启后生效"})
+    except Exception as e:
+        add_log("ERROR", f"设置服务器 {service_name} 启动模式失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/monitoring', methods=['GET'])
+def get_monitoring_status(service_name):
+    """获取监控状态"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        server_info = client.get(f'/dedicated/server/{service_name}')
+        return jsonify({"success": True, "monitoring": server_info.get('monitoring', False)})
+    except Exception as e:
+        add_log("ERROR", f"获取服务器 {service_name} 监控状态失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/monitoring', methods=['PUT'])
+def set_monitoring_status(service_name):
+    """设置监控状态"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    data = request.json
+    enabled = data.get('enabled', False)
+    
+    try:
+        client.put(f'/dedicated/server/{service_name}', monitoring=enabled)
+        add_log("INFO", f"服务器 {service_name} 监控已{'开启' if enabled else '关闭'}", "server_control")
+        return jsonify({"success": True, "message": f"监控已{'开启' if enabled else '关闭'}"})
+    except Exception as e:
+        add_log("ERROR", f"设置服务器 {service_name} 监控状态失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/hardware', methods=['GET'])
+def get_hardware_info(service_name):
+    """获取硬件详细信息"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        hardware = client.get(f'/dedicated/server/{service_name}/specifications/hardware')
+        return jsonify({
+            "success": True,
+            "hardware": {
+                'diskGroups': hardware.get('diskGroups', []),
+                'memorySize': hardware.get('memorySize', {}),
+                'processorName': hardware.get('processorName', 'N/A'),
+                'processorArchitecture': hardware.get('processorArchitecture', 'N/A'),
+                'processorCores': hardware.get('processorCores', 0),
+                'processorThreads': hardware.get('processorThreads', 0),
+                'defaultHardwareRaidSize': hardware.get('defaultHardwareRaidSize', {}),
+                'defaultHardwareRaidType': hardware.get('defaultHardwareRaidType', 'N/A')
+            }
+        })
+    except Exception as e:
+        add_log("ERROR", f"获取服务器 {service_name} 硬件信息失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/ips', methods=['GET'])
+def get_server_ips(service_name):
+    """获取服务器IP列表"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        ip_list = client.get(f'/dedicated/server/{service_name}/ips')
+        ips = []
+        for ip in ip_list:
+            try:
+                ip_detail = client.get(f'/ip/{ip.replace("/", "%2F")}')
+                ips.append({
+                    'ip': ip,
+                    'type': ip_detail.get('type', 'N/A'),
+                    'description': ip_detail.get('description', ''),
+                    'routedTo': ip_detail.get('routedTo', {}).get('serviceName', '')
+                })
+            except:
+                ips.append({'ip': ip, 'type': 'unknown'})
+        
+        return jsonify({"success": True, "ips": ips, "total": len(ips)})
+    except Exception as e:
+        add_log("ERROR", f"获取服务器 {service_name} IP列表失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/reverse', methods=['GET'])
+def get_reverse_dns(service_name):
+    """获取反向DNS"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        server_info = client.get(f'/dedicated/server/{service_name}')
+        main_ip = server_info.get('ip')
+        reverse_list = []
+        if main_ip:
+            try:
+                reverses = client.get(f'/dedicated/server/{service_name}/reverse')
+                for rev_ip in reverses:
+                    rev_detail = client.get(f'/dedicated/server/{service_name}/reverse/{rev_ip}')
+                    reverse_list.append({'ipReverse': rev_ip, 'reverse': rev_detail.get('reverse', '')})
+            except:
+                pass
+        
+        return jsonify({"success": True, "reverses": reverse_list})
+    except Exception as e:
+        add_log("ERROR", f"获取服务器 {service_name} 反向DNS失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/reverse', methods=['POST'])
+def set_reverse_dns(service_name):
+    """设置反向DNS"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    data = request.json
+    ip_address = data.get('ip')
+    reverse = data.get('reverse')
+    
+    if not ip_address or not reverse:
+        return jsonify({"success": False, "error": "IP地址和反向DNS不能为空"}), 400
+    
+    try:
+        client.post(f'/dedicated/server/{service_name}/reverse', ipReverse=ip_address, reverse=reverse)
+        add_log("INFO", f"服务器 {service_name} IP {ip_address} 反向DNS已设置为 {reverse}", "server_control")
+        return jsonify({"success": True, "message": "反向DNS已设置"})
+    except Exception as e:
+        add_log("ERROR", f"设置服务器 {service_name} 反向DNS失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/serviceinfo', methods=['GET'])
+def get_service_info(service_name):
+    """获取服务信息（到期时间等）"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        service_info = client.get(f'/dedicated/server/{service_name}/serviceInfos')
+        return jsonify({
+            "success": True,
+            "serviceInfo": {
+                'status': service_info.get('status', 'unknown'),
+                'expiration': service_info.get('expiration', ''),
+                'creation': service_info.get('creation', ''),
+                'renewalType': service_info.get('renew', {}).get('automatic', False),
+                'renewalPeriod': service_info.get('renew', {}).get('period', 0)
+            }
+        })
+    except Exception as e:
+        add_log("ERROR", f"获取服务器 {service_name} 服务信息失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/partition-schemes', methods=['GET', 'OPTIONS'])
+def get_partition_schemes(service_name):
+    """获取可用的分区方案"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        # 获取模板的分区方案
+        data = request.args
+        template_name = data.get('templateName')
+        
+        if not template_name:
+            return jsonify({"success": False, "error": "缺少templateName参数"}), 400
+        
+        schemes = client.get(f'/dedicated/installationTemplate/{template_name}/partitionScheme')
+        scheme_details = []
+        
+        for scheme_name in schemes:
+            try:
+                scheme_info = client.get(f'/dedicated/installationTemplate/{template_name}/partitionScheme/{scheme_name}')
+                partitions = client.get(f'/dedicated/installationTemplate/{template_name}/partitionScheme/{scheme_name}/partition')
+                
+                partition_details = []
+                for partition_name in partitions:
+                    partition_info = client.get(f'/dedicated/installationTemplate/{template_name}/partitionScheme/{scheme_name}/partition/{partition_name}')
+                    partition_details.append({
+                        'mountpoint': partition_name,
+                        'filesystem': partition_info.get('filesystem', ''),
+                        'size': partition_info.get('size', 0),
+                        'order': partition_info.get('order', 0),
+                        'raid': partition_info.get('raid', None),
+                        'type': partition_info.get('type', 'primary')
+                    })
+                
+                scheme_details.append({
+                    'name': scheme_name,
+                    'priority': scheme_info.get('priority', 0),
+                    'partitions': sorted(partition_details, key=lambda x: x['order'])
+                })
+            except:
+                pass
+        
+        return jsonify({"success": True, "schemes": scheme_details})
+    except Exception as e:
+        add_log("ERROR", f"获取分区方案失败: {str(e)}", "server_control")
         return jsonify({"success": False, "error": str(e)}), 500
 
 # ==================== VPS 监控相关功能 ====================
