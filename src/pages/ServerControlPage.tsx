@@ -68,8 +68,25 @@ const ServerControlPage: React.FC = () => {
     try {
       const response = await api.get('/server-control/list');
       if (response.data.success) {
-        setServers(response.data.servers);
-        showToast({ type: 'success', title: `已加载 ${response.data.total} 台服务器` });
+        // 过滤掉非活跃状态的服务器
+        const activeServers = response.data.servers.filter((server: ServerInfo) => {
+          const state = server.state?.toLowerCase();
+          const status = server.status?.toLowerCase();
+          
+          // 排除已过期、已暂停、错误状态的服务器
+          if (status === 'expired' || status === 'suspended') return false;
+          if (state === 'error' || state === 'suspended') return false;
+          
+          // 只显示正常状态的服务器
+          return state === 'ok' || state === 'active';
+        });
+        
+        setServers(activeServers);
+        showToast({ 
+          type: 'success', 
+          title: `已加载 ${activeServers.length} 台活跃服务器` + 
+                 (activeServers.length < response.data.total ? ` (已过滤 ${response.data.total - activeServers.length} 台非活跃服务器)` : '')
+        });
       } else {
         showToast({ type: 'error', title: response.data.error || '获取服务器列表失败' });
       }
