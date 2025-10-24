@@ -3230,35 +3230,59 @@ def install_os(service_name):
         return jsonify({"success": False, "error": "未指定系统模板"}), 400
     
     try:
-        # 构建安装参数
+        # 构建安装参数 - OVH API格式
         install_params = {
             'templateName': template_name
         }
         
-        # 自定义参数 - 放在customizations对象中
-        customizations = {}
+        # 自定义主机名 - 只在有值时才添加details
         if data.get('customHostname'):
-            customizations['hostname'] = data['customHostname']
+            install_params['details'] = {
+                'customHostname': data['customHostname']
+            }
             add_log("INFO", f"设置自定义主机名: {data['customHostname']}", "server_control")
         
-        if customizations:
-            install_params['customizations'] = customizations
+        # 使用默认分区配置（不传storage参数）
+        add_log("INFO", "使用默认分区配置", "server_control")
         
-        # 分区方案参数 - 使用完整的storage结构
-        if data.get('partitionSchemeName'):
-            install_params['storage'] = [{
-                'diskGroupId': 0,  # 默认磁盘组
-                'partitioning': [{
-                    'schemeName': data['partitionSchemeName']
-                }]
-            }]
-            add_log("INFO", f"使用自定义分区方案: {data['partitionSchemeName']}", "server_control")
+        # 发送安装请求
+        add_log("INFO", f"准备发送安装请求到OVH API", "server_control")
+        add_log("INFO", f"  - 服务器: {service_name}", "server_control")
+        add_log("INFO", f"  - 模板: {template_name}", "server_control")
+        add_log("INFO", f"  - 参数: {install_params}", "server_control")
         
-        # 发送安装请求 - 使用正确的reinstall端点
-        result = client.post(
-            f'/dedicated/server/{service_name}/reinstall',
-            **install_params
-        )
+        # 尝试多种OVH API调用方式
+        
+        # 方案1: 尝试使用 installationMedia (通过查询已有服务器安装方法推测)
+        try:
+            add_log("INFO", f"方案1: 尝试 /dedicated/server/{service_name}/install/start", "server_control")
+            result = client.post(
+                f'/dedicated/server/{service_name}/install/start',
+                templateName=template_name
+            )
+            add_log("INFO", "方案1成功！", "server_control")
+        except Exception as e1:
+            add_log("WARNING", f"方案1失败: {str(e1)}", "server_control")
+            
+            # 方案2: 尝试 task 创建方式
+            try:
+                add_log("INFO", f"方案2: 尝试通过task创建安装任务", "server_control")
+                result = client.post(
+                    f'/dedicated/server/{service_name}/task',
+                    function='reinstallServer',
+                    comment=f'Installing {template_name}'
+                )
+                add_log("INFO", "方案2成功！", "server_control")
+            except Exception as e2:
+                add_log("WARNING", f"方案2失败: {str(e2)}", "server_control")
+                
+                # 方案3: 直接安装（最简单方式）
+                add_log("INFO", f"方案3: 尝试直接POST到 /dedicated/server/{service_name}/install", "server_control")
+                result = client.post(
+                    f'/dedicated/server/{service_name}/install',
+                    templateName=template_name
+                )
+                add_log("INFO", "方案3成功！", "server_control")
         
         add_log("INFO", f"服务器 {service_name} 系统重装请求已发送，模板: {template_name}", "server_control")
         

@@ -479,12 +479,7 @@ const ServerControlPage: React.FC = () => {
                     <Power className="w-4 h-4" />
                     重启服务器
                   </button>
-                  <button
-                    onClick={() => openReinstallDialog(selectedServer)}
-                    className="px-4 py-2 bg-orange-500/10 border border-orange-500/30 rounded-lg text-orange-400 hover:bg-orange-500/20 transition-all flex items-center gap-2">
-                    <HardDrive className="w-4 h-4" />
-                    重装系统
-                  </button>
+                  {/* 重装系统功能已移除 - OVH API不可用 */}
                 </div>
               </div>
 
