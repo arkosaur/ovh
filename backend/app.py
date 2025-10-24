@@ -3097,6 +3097,203 @@ def check_config_sniper_task(task_id):
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
+# ==================== 服务器管理（已购服务器控制）====================
+
+@app.route('/api/server-control/list', methods=['GET'])
+def get_my_servers():
+    """获取当前账户的服务器列表"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        # 获取服务器列表
+        server_names = client.get('/dedicated/server')
+        add_log("INFO", f"获取服务器列表成功，共 {len(server_names)} 台", "server_control")
+        
+        servers = []
+        for server_name in server_names:
+            try:
+                # 获取每台服务器的详细信息
+                server_info = client.get(f'/dedicated/server/{server_name}')
+                service_info = client.get(f'/dedicated/server/{server_name}/serviceInfos')
+                
+                servers.append({
+                    'serviceName': server_name,
+                    'name': server_info.get('name', server_name),
+                    'commercialRange': server_info.get('commercialRange', 'N/A'),
+                    'datacenter': server_info.get('datacenter', 'N/A'),
+                    'state': server_info.get('state', 'unknown'),
+                    'monitoring': server_info.get('monitoring', False),
+                    'reverse': server_info.get('reverse', ''),
+                    'ip': server_info.get('ip', 'N/A'),
+                    'os': server_info.get('os', 'N/A'),
+                    'bootId': server_info.get('bootId', None),
+                    'professionalUse': server_info.get('professionalUse', False),
+                    'status': service_info.get('status', 'unknown'),
+                    'renewalType': service_info.get('renew', {}).get('automatic', False)
+                })
+                
+            except Exception as e:
+                add_log("ERROR", f"获取服务器 {server_name} 详情失败: {str(e)}", "server_control")
+                # 即使获取详情失败，也返回基本信息
+                servers.append({
+                    'serviceName': server_name,
+                    'name': server_name,
+                    'error': str(e)
+                })
+        
+        return jsonify({
+            "success": True,
+            "servers": servers,
+            "total": len(servers)
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"获取服务器列表失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/reboot', methods=['POST'])
+def reboot_server(service_name):
+    """重启服务器"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        # 发送重启请求
+        result = client.post(f'/dedicated/server/{service_name}/reboot')
+        add_log("INFO", f"服务器 {service_name} 重启请求已发送", "server_control")
+        
+        return jsonify({
+            "success": True,
+            "message": f"服务器 {service_name} 重启请求已发送",
+            "taskId": result.get('taskId') if isinstance(result, dict) else None
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"重启服务器 {service_name} 失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/templates', methods=['GET'])
+def get_os_templates(service_name):
+    """获取服务器可用的操作系统模板"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        # 获取兼容的操作系统模板
+        templates = client.get(f'/dedicated/server/{service_name}/install/compatibleTemplates')
+        add_log("INFO", f"获取服务器 {service_name} 可用系统模板成功", "server_control")
+        
+        # 获取每个模板的详细信息
+        template_details = []
+        for template_name in templates.get('ovh', [])[:20]:  # 限制前20个，避免请求过多
+            try:
+                detail = client.get(f'/dedicated/installationTemplate/{template_name}')
+                template_details.append({
+                    'templateName': template_name,
+                    'distribution': detail.get('distribution', 'N/A'),
+                    'family': detail.get('family', 'N/A'),
+                    'description': detail.get('description', ''),
+                    'bitFormat': detail.get('bitFormat', 64)
+                })
+            except:
+                template_details.append({
+                    'templateName': template_name,
+                    'distribution': template_name,
+                    'family': 'unknown'
+                })
+        
+        return jsonify({
+            "success": True,
+            "templates": template_details,
+            "total": len(template_details)
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"获取服务器 {service_name} 系统模板失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/install', methods=['POST'])
+def install_os(service_name):
+    """重装服务器操作系统"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    data = request.json
+    template_name = data.get('templateName')
+    
+    if not template_name:
+        return jsonify({"success": False, "error": "未指定系统模板"}), 400
+    
+    try:
+        # 构建安装参数
+        install_params = {
+            'templateName': template_name
+        }
+        
+        # 可选参数
+        if data.get('customHostname'):
+            install_params['customHostname'] = data['customHostname']
+        
+        # 发送安装请求
+        result = client.post(
+            f'/dedicated/server/{service_name}/install/start',
+            **install_params
+        )
+        
+        add_log("INFO", f"服务器 {service_name} 系统重装请求已发送，模板: {template_name}", "server_control")
+        
+        return jsonify({
+            "success": True,
+            "message": f"服务器 {service_name} 系统重装请求已发送",
+            "taskId": result.get('taskId') if isinstance(result, dict) else None
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"重装服务器 {service_name} 系统失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/tasks', methods=['GET'])
+def get_server_tasks(service_name):
+    """获取服务器任务列表"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        # 获取任务列表
+        task_ids = client.get(f'/dedicated/server/{service_name}/task')
+        
+        tasks = []
+        # 只获取最近10个任务的详情
+        for task_id in task_ids[-10:]:
+            try:
+                task_detail = client.get(f'/dedicated/server/{service_name}/task/{task_id}')
+                tasks.append({
+                    'taskId': task_id,
+                    'function': task_detail.get('function', 'N/A'),
+                    'status': task_detail.get('status', 'unknown'),
+                    'comment': task_detail.get('comment', ''),
+                    'startDate': task_detail.get('startDate', ''),
+                    'doneDate': task_detail.get('doneDate', '')
+                })
+            except:
+                pass
+        
+        return jsonify({
+            "success": True,
+            "tasks": tasks,
+            "total": len(tasks)
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"获取服务器 {service_name} 任务列表失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 # ==================== VPS 监控相关功能 ====================
 
 def check_vps_datacenter_availability(plan_code, ovh_subsidiary="IE"):

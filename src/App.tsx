@@ -17,6 +17,7 @@ import OVHAvailabilityPage from "./pages/OVHAvailabilityPage";
 import MonitorPage from "./pages/MonitorPage";
 import VPSMonitorPage from "./pages/VPSMonitorPage";
 import ConfigSniperPage from "./pages/ConfigSniperPage";
+import ServerControlPage from "./pages/ServerControlPage";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
 
@@ -46,6 +47,7 @@ const App = () => (
                   <Route path="monitor" element={<MonitorPage />} />
                   <Route path="vps-monitor" element={<VPSMonitorPage />} />
                   <Route path="config-sniper" element={<ConfigSniperPage />} />
+                  <Route path="server-control" element={<ServerControlPage />} />
                   <Route path="history" element={<HistoryPage />} />
                   <Route path="logs" element={<LogsPage />} />
                   <Route path="settings" element={<SettingsPage />} />
