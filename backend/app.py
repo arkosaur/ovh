@@ -3235,18 +3235,28 @@ def install_os(service_name):
             'templateName': template_name
         }
         
-        # 可选参数
+        # 自定义参数 - 放在customizations对象中
+        customizations = {}
         if data.get('customHostname'):
-            install_params['customHostname'] = data['customHostname']
+            customizations['hostname'] = data['customHostname']
+            add_log("INFO", f"设置自定义主机名: {data['customHostname']}", "server_control")
         
-        # 分区方案参数
+        if customizations:
+            install_params['customizations'] = customizations
+        
+        # 分区方案参数 - 使用完整的storage结构
         if data.get('partitionSchemeName'):
-            install_params['partitionSchemeName'] = data['partitionSchemeName']
+            install_params['storage'] = [{
+                'diskGroupId': 0,  # 默认磁盘组
+                'partitioning': [{
+                    'schemeName': data['partitionSchemeName']
+                }]
+            }]
             add_log("INFO", f"使用自定义分区方案: {data['partitionSchemeName']}", "server_control")
         
-        # 发送安装请求
+        # 发送安装请求 - 使用正确的reinstall端点
         result = client.post(
-            f'/dedicated/server/{service_name}/install/start',
+            f'/dedicated/server/{service_name}/reinstall',
             **install_params
         )
         
@@ -3514,20 +3524,42 @@ def get_partition_schemes(service_name):
         data = request.args
         template_name = data.get('templateName')
         
+        add_log("INFO", f"[Partition] 请求获取分区方案: server={service_name}, template={template_name}", "server_control")
+        
         if not template_name:
+            add_log("ERROR", f"[Partition] 缺少templateName参数", "server_control")
             return jsonify({"success": False, "error": "缺少templateName参数"}), 400
         
-        schemes = client.get(f'/dedicated/installationTemplate/{template_name}/partitionScheme')
+        from urllib.parse import quote
+        
+        # URL编码模板名称，避免特殊字符问题
+        encoded_template = quote(template_name, safe='')
+        
+        schemes = client.get(f'/dedicated/installationTemplate/{encoded_template}/partitionScheme')
+        add_log("INFO", f"[Partition] OVH返回方案列表: {schemes}", "server_control")
         scheme_details = []
         
         for scheme_name in schemes:
             try:
-                scheme_info = client.get(f'/dedicated/installationTemplate/{template_name}/partitionScheme/{scheme_name}')
-                partitions = client.get(f'/dedicated/installationTemplate/{template_name}/partitionScheme/{scheme_name}/partition')
+                add_log("INFO", f"[Partition] 处理方案: {scheme_name}", "server_control")
+                
+                # URL编码方案名称
+                encoded_scheme = quote(scheme_name, safe='')
+                
+                # 获取方案信息
+                scheme_url = f'/dedicated/installationTemplate/{encoded_template}/partitionScheme/{encoded_scheme}'
+                add_log("INFO", f"[Partition] 获取方案信息URL: {scheme_url}", "server_control")
+                scheme_info = client.get(scheme_url)
+                
+                # 获取分区列表
+                partition_url = f'/dedicated/installationTemplate/{encoded_template}/partitionScheme/{encoded_scheme}/partition'
+                add_log("INFO", f"[Partition] 获取分区列表URL: {partition_url}", "server_control")
+                partitions = client.get(partition_url)
                 
                 partition_details = []
                 for partition_name in partitions:
-                    partition_info = client.get(f'/dedicated/installationTemplate/{template_name}/partitionScheme/{scheme_name}/partition/{partition_name}')
+                    encoded_partition = quote(partition_name, safe='')
+                    partition_info = client.get(f'/dedicated/installationTemplate/{encoded_template}/partitionScheme/{encoded_scheme}/partition/{encoded_partition}')
                     partition_details.append({
                         'mountpoint': partition_name,
                         'filesystem': partition_info.get('filesystem', ''),
@@ -3542,12 +3574,19 @@ def get_partition_schemes(service_name):
                     'priority': scheme_info.get('priority', 0),
                     'partitions': sorted(partition_details, key=lambda x: x['order'])
                 })
-            except:
-                pass
+            except Exception as e:
+                # 如果获取详情失败，至少返回方案名称
+                add_log("WARNING", f"[Partition] 获取方案 {scheme_name} 详情失败: {str(e)}", "server_control")
+                scheme_details.append({
+                    'name': scheme_name,
+                    'priority': 0,
+                    'partitions': []
+                })
         
+        add_log("INFO", f"[Partition] 成功获取 {len(scheme_details)} 个分区方案", "server_control")
         return jsonify({"success": True, "schemes": scheme_details})
     except Exception as e:
-        add_log("ERROR", f"获取分区方案失败: {str(e)}", "server_control")
+        add_log("ERROR", f"[Partition] 获取分区方案失败: {str(e)}", "server_control")
         return jsonify({"success": False, "error": str(e)}), 500
 
 # ==================== VPS 监控相关功能 ====================

@@ -157,19 +157,25 @@ const ServerControlPage: React.FC = () => {
 
   // Task 3.1: 获取分区方案
   const fetchPartitionSchemes = async (serviceName: string, templateName: string) => {
+    console.log('[Partition] 开始加载分区方案:', { serviceName, templateName });
     setLoadingPartitions(true);
     try {
       const response = await api.get(`/server-control/${serviceName}/partition-schemes?templateName=${templateName}`);
+      console.log('[Partition] API响应:', response.data);
+      
       if (response.data.success) {
         setPartitionSchemes(response.data.schemes);
-        // 自动选择第一个方案
+        // 不自动选择，让用户决定是否使用自定义分区
+        setSelectedScheme('');
+        
         if (response.data.schemes.length > 0) {
-          setSelectedScheme(response.data.schemes[0].name);
+          console.log('[Partition] 加载到方案:', response.data.schemes);
           showToast({ 
             type: 'info', 
-            title: `已加载 ${response.data.schemes.length} 个分区方案` 
+            title: `已加载 ${response.data.schemes.length} 个分区方案（可选）` 
           });
         } else {
+          console.log('[Partition] 模板无分区方案');
           showToast({ 
             type: 'warning', 
             title: '该模板无可用分区方案' 
@@ -177,8 +183,10 @@ const ServerControlPage: React.FC = () => {
         }
       }
     } catch (error: any) {
-      console.error('获取分区方案失败:', error);
+      console.error('[Partition] 获取失败:', error);
+      console.error('[Partition] 错误详情:', error.response?.data);
       setPartitionSchemes([]);
+      setSelectedScheme('');
       showToast({ 
         type: 'error', 
         title: '获取分区方案失败，请重启后端服务器' 
@@ -226,8 +234,12 @@ const ServerControlPage: React.FC = () => {
       // 如果用户选择了分区方案，传递给后端
       if (selectedScheme) {
         installData.partitionSchemeName = selectedScheme;
+        console.log('[Install] 使用自定义分区方案:', selectedScheme);
+      } else {
+        console.log('[Install] 未选择分区方案，将使用默认分区');
       }
       
+      console.log('[Install] 安装数据:', installData);
       const response = await api.post(`/server-control/${selectedServer.serviceName}/install`, installData);
 
       if (response.data.success) {
@@ -694,6 +706,7 @@ const ServerControlPage: React.FC = () => {
                       style={{
                         background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)'
                       }}>
+                      <option value="" className="bg-cyber-bg text-cyber-muted">使用默认分区（推荐）</option>
                       {partitionSchemes.map((scheme) => (
                         <option 
                           key={scheme.name} 
@@ -724,10 +737,19 @@ const ServerControlPage: React.FC = () => {
                             <div key={idx} className="mb-2 pb-2 border-b border-cyber-accent/10 last:border-0">
                               <div className="flex justify-between">
                                 <span className="font-mono text-cyber-accent">{partition.mountpoint}</span>
-                                <span className="text-cyber-muted">{partition.size} MB</span>
+                                <span className="text-cyber-muted">
+                                  {typeof partition.size === 'object' && partition.size?.value 
+                                    ? `${partition.size.value} ${partition.size.unit || 'MB'}`
+                                    : `${partition.size || 0} MB`
+                                  }
+                                </span>
                               </div>
                               <div className="text-xs text-cyber-muted mt-1">
-                                {partition.filesystem} | {partition.type} | RAID: {partition.raid || 'N/A'}
+                                {partition.filesystem} | {partition.type} | RAID: {
+                                  typeof partition.raid === 'object' && partition.raid !== null && 'value' in partition.raid
+                                    ? (partition.raid as any).value 
+                                    : (partition.raid || 'N/A')
+                                }
                               </div>
                             </div>
                           ))}
