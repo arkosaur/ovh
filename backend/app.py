@@ -384,47 +384,97 @@ def check_server_availability(plan_code, options=None):
         return None
     
     try:
-        # 对于带数据中心后缀的planCode（如24rise012-mum），OVH API可能不认识
-        # 直接使用完整的planCode查询，让OVH API返回实际数据
-        # 构建查询参数
-        params = {'planCode': plan_code}
+        # 调用OVH API获取所有配置组合的可用性
+        availabilities = client.get('/dedicated/server/datacenter/availabilities', planCode=plan_code)
         
-        # 如果提供了配置选项，添加到查询参数中
+        # 如果没有返回数据
+        if not availabilities or len(availabilities) == 0:
+            add_log("WARNING", f"未获取到 {plan_code} 的可用性数据")
+            return {}
+        
+        # 如果用户选择了自定义配置，需要精确匹配
         if options and len(options) > 0:
-            # OVH API使用'addonFamily'参数来指定额外配置
-            # 将选项数组作为多个参数传递
-            for option in options:
-                # 添加每个选项到查询参数
-                if 'addonFamily' not in params:
-                    params['addonFamily'] = []
-                if not isinstance(params['addonFamily'], list):
-                    params['addonFamily'] = [params['addonFamily']]
-                params['addonFamily'].append(option)
-        
-        availabilities = client.get('/dedicated/server/datacenter/availabilities', **params)
-        result = {}
-        
-        for item in availabilities:
-            datacenters = item.get("datacenters", [])
+            add_log("INFO", f"查询 {plan_code} 的配置选项可用性: {options}")
             
-            for dc_info in datacenters:
-                availability = dc_info.get("availability", "unknown")
-                datacenter_name = dc_info.get("datacenter")
+            # 从 options 中提取内存和存储配置
+            memory_option = None
+            storage_option = None
+            
+            for opt in options:
+                opt_lower = opt.lower()
+                # 匹配内存配置
+                if 'ram-' in opt_lower or 'memory' in opt_lower:
+                    memory_option = opt
+                # 匹配存储配置
+                elif 'softraid-' in opt_lower or 'disk' in opt_lower or 'nvme' in opt_lower or 'sa' in opt_lower:
+                    storage_option = opt
+            
+            add_log("INFO", f"提取配置 - 内存: {memory_option}, 存储: {storage_option}")
+            
+            # 遍历所有配置组合，找到匹配的
+            matched_config = None
+            for item in availabilities:
+                item_memory = item.get("memory")
+                item_storage = item.get("storage")
+                item_fqn = item.get("fqn")
                 
-                # 确保可用性状态有正确的值
-                if not availability or availability == "unknown":
-                    result[datacenter_name] = "unknown"
-                elif availability == "unavailable":
-                    result[datacenter_name] = "unavailable"
-                else:
-                    # 任何非"unavailable"或"unknown"的状态都被视为"available"
-                    result[datacenter_name] = availability
+                # 匹配逻辑
+                memory_match = (not memory_option) or (item_memory == memory_option)
+                storage_match = (not storage_option) or (item_storage == storage_option)
                 
-        config_info = f" (配置: {', '.join(options)})" if options else " (默认配置)"
-        add_log("INFO", f"成功检查 {plan_code}{config_info} 的可用性: {result}")
-        return result
+                if memory_match and storage_match:
+                    matched_config = item
+                    add_log("INFO", f"✅ 找到匹配配置: {item_fqn}")
+                    break
+            
+            # 如果找到匹配的配置
+            if matched_config:
+                result = {}
+                for dc in matched_config.get("datacenters", []):
+                    datacenter_name = dc.get("datacenter")
+                    availability = dc.get("availability", "unknown")
+                    
+                    if datacenter_name:
+                        if not availability or availability == "unknown":
+                            result[datacenter_name] = "unknown"
+                        elif availability == "unavailable":
+                            result[datacenter_name] = "unavailable"
+                        else:
+                            result[datacenter_name] = availability
+                
+                add_log("INFO", f"配置 {matched_config.get('fqn')} 的可用性: {result}")
+                return result
+            else:
+                # 没找到匹配的配置
+                add_log("WARNING", f"❌ 未找到匹配的配置组合！请求: {options}")
+                add_log("INFO", f"可用的配置组合: {[item.get('fqn') for item in availabilities]}")
+                return {}
+        
+        else:
+            # 没有指定配置，返回第一个（默认配置）
+            default_config = availabilities[0]
+            default_fqn = default_config.get("fqn")
+            add_log("INFO", f"使用默认配置: {default_fqn}")
+            
+            result = {}
+            for dc in default_config.get("datacenters", []):
+                datacenter_name = dc.get("datacenter")
+                availability = dc.get("availability", "unknown")
+                
+                if datacenter_name:
+                    if not availability or availability == "unknown":
+                        result[datacenter_name] = "unknown"
+                    elif availability == "unavailable":
+                        result[datacenter_name] = "unavailable"
+                    else:
+                        result[datacenter_name] = availability
+            
+            add_log("INFO", f"默认配置 {default_fqn} 的可用性: {result}")
+            return result
+            
     except Exception as e:
         add_log("ERROR", f"Failed to check availability for {plan_code}: {str(e)}")
+        add_log("ERROR", f"Traceback: {traceback.format_exc()}")
         return None
 
 # Purchase server
