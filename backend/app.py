@@ -3916,11 +3916,19 @@ def get_ipmi_console(service_name):
         # 创建KVM控制台访问 - 使用POST方法，包含ttl参数
         add_log("INFO", f"[IPMI] 请求KVM控制台访问，类型: {access_type}", "server_control")
         
-        # 创建访问任务（返回taskId）
+        # 获取客户端真实IP（从请求头中获取）
+        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        if ',' in client_ip:
+            client_ip = client_ip.split(',')[0].strip()
+        
+        add_log("INFO", f"[IPMI] 客户端IP: {client_ip}", "server_control")
+        
+        # 创建访问任务（返回taskId），添加IP白名单
         task = client.post(
             f'/dedicated/server/{service_name}/features/ipmi/access',
             type=access_type,
-            ttl=15  # 15分钟有效期
+            ttl=60,  # 增加到60分钟有效期
+            ipToAllow=client_ip  # 添加客户端IP到白名单
         )
         
         task_id = task.get('taskId')
