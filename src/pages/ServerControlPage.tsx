@@ -1538,7 +1538,9 @@ const ServerControlPage: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-cyber-dark border border-cyber-accent rounded-lg p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto">
+              className={`bg-cyber-dark border border-cyber-accent rounded-lg p-6 max-w-3xl w-full ${
+                installCompleted ? '' : 'max-h-[80vh] overflow-y-auto'
+              }`}>
               
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -1613,9 +1615,8 @@ const ServerControlPage: React.FC = () => {
                         transition={{ duration: 0.5 }}
                       />
                     </div>
-                    <div className="flex items-center justify-between mt-2 text-sm text-cyber-muted">
+                    <div className="mt-2 text-sm text-cyber-muted text-center">
                       <span>{installProgress.completedSteps} / {installProgress.totalSteps} 步骤完成</span>
-                      <span>已用时间: {Math.floor(installProgress.elapsedTime / 60)}分{installProgress.elapsedTime % 60}秒</span>
                     </div>
                   </div>
 
@@ -1634,71 +1635,77 @@ const ServerControlPage: React.FC = () => {
                     </div>
                   )}
 
-                  {/* 安装步骤列表 */}
+                  {/* 当前步骤 - 只显示正在执行的步骤 */}
                   <div>
-                    <h3 className="text-lg font-semibold text-cyber-text mb-3">安装步骤</h3>
-                    <div className="space-y-2">
-                      {installProgress.steps.map((step, index) => (
-                        <div
-                          key={index}
-                          className={`p-3 rounded-lg border ${
-                            step.status === 'done'
-                              ? 'bg-green-500/10 border-green-500/30'
-                              : step.status === 'doing'
-                              ? 'bg-blue-500/10 border-blue-500/30'
-                              : step.status === 'error'
-                              ? 'bg-red-500/10 border-red-500/30'
-                              : 'bg-cyber-grid/20 border-cyber-accent/20'
-                          }`}>
+                    <h3 className="text-lg font-semibold text-cyber-text mb-3">当前步骤</h3>
+                    {(() => {
+                      // 查找正在执行的步骤
+                      const currentStep = installProgress.steps.find(s => s.status === 'doing');
+                      // 如果没有正在执行的，显示最后完成的步骤
+                      const lastDoneStep = [...installProgress.steps].reverse().find(s => s.status === 'done');
+                      const stepToShow = currentStep || lastDoneStep;
+                      
+                      if (!stepToShow) return (
+                        <div className="p-4 bg-cyber-grid/20 border border-cyber-accent/20 rounded-lg text-center text-cyber-muted">
+                          准备中...
+                        </div>
+                      );
+                      
+                      return (
+                        <div className={`p-4 rounded-lg border ${
+                          stepToShow.status === 'done'
+                            ? 'bg-green-500/10 border-green-500/30'
+                            : stepToShow.status === 'doing'
+                            ? 'bg-blue-500/10 border-blue-500/30'
+                            : stepToShow.status === 'error'
+                            ? 'bg-red-500/10 border-red-500/30'
+                            : 'bg-cyber-grid/20 border-cyber-accent/20'
+                        }`}>
                           <div className="flex items-center gap-3">
-                            {step.status === 'done' && (
-                              <span className="text-green-500 text-lg">✓</span>
+                            {stepToShow.status === 'done' && (
+                              <span className="text-green-500 text-xl">✓</span>
                             )}
-                            {step.status === 'doing' && (
-                              <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
+                            {stepToShow.status === 'doing' && (
+                              <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />
                             )}
-                            {step.status === 'error' && (
-                              <AlertCircle className="w-4 h-4 text-red-500" />
-                            )}
-                            {(step.status === 'todo' || step.status === 'init') && (
-                              <span className="w-4 h-4 rounded-full border-2 border-cyber-muted"></span>
+                            {stepToShow.status === 'error' && (
+                              <AlertCircle className="w-5 h-5 text-red-500" />
                             )}
                             
                             <div className="flex-1">
-                              <p className={`font-medium ${
-                                step.status === 'done'
+                              <p className={`font-medium text-base ${
+                                stepToShow.status === 'done'
                                   ? 'text-green-400'
-                                  : step.status === 'doing'
+                                  : stepToShow.status === 'doing'
                                   ? 'text-blue-400'
-                                  : step.status === 'error'
+                                  : stepToShow.status === 'error'
                                   ? 'text-red-400'
                                   : 'text-cyber-muted'
                               }`}>
-                                {step.comment || `步骤 ${index + 1}`}
+                                {stepToShow.comment || '处理中'}
                               </p>
-                              {step.error && (
-                                <p className="text-sm text-red-400 mt-1">错误: {step.error}</p>
+                              {stepToShow.error && (
+                                <p className="text-sm text-red-400 mt-1">错误: {stepToShow.error}</p>
                               )}
                             </div>
 
-                            <span className={`text-xs px-2 py-1 rounded ${
-                              step.status === 'done'
+                            <span className={`text-xs px-3 py-1 rounded ${
+                              stepToShow.status === 'done'
                                 ? 'bg-green-500/20 text-green-400'
-                                : step.status === 'doing'
+                                : stepToShow.status === 'doing'
                                 ? 'bg-blue-500/20 text-blue-400'
-                                : step.status === 'error'
+                                : stepToShow.status === 'error'
                                 ? 'bg-red-500/20 text-red-400'
                                 : 'bg-cyber-grid/30 text-cyber-muted'
                             }`}>
-                              {step.status === 'done' ? '完成' : 
-                               step.status === 'doing' ? '进行中' : 
-                               step.status === 'error' ? '错误' : 
-                               step.status === 'todo' ? '待处理' : '初始化'}
+                              {stepToShow.status === 'done' ? '完成' : 
+                               stepToShow.status === 'doing' ? '进行中' : 
+                               stepToShow.status === 'error' ? '错误' : '待处理'}
                             </span>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })()}
                   </div>
 
                   {/* 底部按钮 */}
