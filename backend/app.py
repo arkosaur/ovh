@@ -2650,6 +2650,40 @@ def format_storage_display(storage_code):
         return f"{count}x {size}GB {type_str}"
     return storage_code
 
+def format_config_display(memory_code, storage_code):
+    """格式化配置组合显示"""
+    mem_display = format_memory_display(memory_code) if memory_code else "默认内存"
+    stor_display = format_storage_display(storage_code) if storage_code else "默认存储"
+    return f"{mem_display} + {stor_display}"
+
+def match_config(user_memory, user_storage, ovh_memory, ovh_storage):
+    """匹配配置 - 使用和 check_server_availability 相同的逻辑
+    
+    Args:
+        user_memory: 用户选择的内存配置（如 ram-16g-24skstor01）
+        user_storage: 用户选择的存储配置（如 hybridsoftraid-4x4000sa-1x500nvme-24skstor）
+        ovh_memory: OVH返回的内存配置（如 ram-16g-ecc-2133）
+        ovh_storage: OVH返回的存储配置（如 hybridsoftraid-4x4000sa-1x500nvme）
+    
+    Returns:
+        bool: 是否匹配
+    """
+    memory_match = True
+    if user_memory and ovh_memory:
+        # 提取前两段进行比较（如 ram-16g）
+        user_memory_parts = user_memory.split('-')[:2]
+        ovh_memory_parts = ovh_memory.split('-')[:2]
+        user_memory_key = '-'.join(user_memory_parts)
+        ovh_memory_key = '-'.join(ovh_memory_parts)
+        memory_match = (user_memory_key == ovh_memory_key)
+    
+    storage_match = True
+    if user_storage and ovh_storage:
+        # 前缀匹配
+        storage_match = user_storage.startswith(ovh_storage)
+    
+    return memory_match and storage_match
+
 # 配置绑定狙击监控线程
 def config_sniper_monitor_loop():
     """配置绑定狙击监控主循环（60秒轮询）"""
@@ -2736,11 +2770,11 @@ def handle_pending_match_task(task):
         
         # 发送 Telegram 通知
         send_telegram_msg(
-            f"✅ 发现新增配置！\n"
-            f"型号: {task['api1_planCode']}\n"
-            f"配置: {format_memory_display(config['memory'])} + {format_storage_display(config['storage'])}\n"
-            f"新增 planCode: {', '.join(new_plancodes)}\n"
-            f"总计: {len(task['matched_api2'])} 个"
+            f"🆕 发现新增配置！\n"
+            f"源型号: {task['api1_planCode']}\n"
+            f"绑定配置: {format_config_display(config['memory'], config['storage'])}\n"
+            f"新增型号: {', '.join(new_plancodes)}\n"
+            f"总计匹配: {len(task['matched_api2'])} 个"
         )
         
         save_config_sniper_tasks()
@@ -2762,17 +2796,18 @@ def handle_pending_match_task(task):
             save_config_sniper_tasks()
             add_log("INFO", f"✅ 未匹配任务完成！{task['api1_planCode']} 发现新增并已下单，任务结束", "config_sniper")
             send_telegram_msg(
-                f"✅ 未匹配任务完成！\n"
-                f"型号: {task['api1_planCode']}\n"
-                f"配置: {format_memory_display(config['memory'])} + {format_storage_display(config['storage'])}\n"
-                f"发现新增型号: {', '.join(new_plancodes)}\n"
-                f"已下单所有机房，任务已完成"
+                f"🎉 待匹配任务完成！\n"
+                f"源型号: {task['api1_planCode']}\n"
+                f"绑定配置: {format_config_display(config['memory'], config['storage'])}\n"
+                f"新增型号: {', '.join(new_plancodes)}\n"
+                f"✅ 已下单所有机房，任务完成"
             )
     else:
         add_log("DEBUG", f"待匹配任务 {task['api1_planCode']} 暂无新增", "config_sniper")
 
 def check_and_queue_plancode(api2_plancode, task, bound_config, client):
     """检查单个 planCode 的可用性并加入队列
+    使用新的配置匹配逻辑：内存提取前两段，存储前缀匹配
     
     Returns:
         bool: 是否有新订单加入队列
@@ -2785,7 +2820,20 @@ def check_and_queue_plancode(api2_plancode, task, bound_config, client):
             planCode=api2_plancode
         )
         
+        # 遍历所有配置组合，使用新的匹配逻辑
         for item in availabilities:
+            item_memory = item.get("memory")
+            item_storage = item.get("storage")
+            item_fqn = item.get("fqn")
+            
+            # 匹配用户绑定的配置
+            config_matched = match_config(bound_config['memory'], bound_config['storage'], 
+                                         item_memory, item_storage)
+            
+            if not config_matched:
+                continue  # 配置不匹配，跳过
+            
+            # 配置匹配，检查所有机房
             for dc in item.get("datacenters", []):
                 availability = dc.get("availability")
                 datacenter = dc.get("datacenter")
@@ -2795,8 +2843,19 @@ def check_and_queue_plancode(api2_plancode, task, bound_config, client):
                     continue
                 
                 add_log("INFO", 
-                    f"🎯 发现可用！API2={api2_plancode} 机房={datacenter} 状态={availability}", 
+                    f"🎯 发现可用！API2={api2_plancode} 配置={item_fqn} 机房={datacenter} 状态={availability}", 
                     "config_sniper")
+                
+                # 发送配置有货TG通知
+                send_telegram_msg(
+                    f"📦 配置有货通知！\n"
+                    f"源型号: {task['api1_planCode']}\n"
+                    f"绑定配置: {format_config_display(bound_config['memory'], bound_config['storage'])}\n"
+                    f"匹配型号: {api2_plancode}\n"
+                    f"实际配置: {format_config_display(item_memory, item_storage)}\n"
+                    f"机房: {datacenter}\n"
+                    f"库存状态: {availability}"
+                )
                 
                 # 检查是否已在队列中（同一个 planCode + datacenter 组合）
                 existing_queue_item = next((q for q in queue 
@@ -2872,14 +2931,16 @@ def check_and_queue_plancode(api2_plancode, task, bound_config, client):
                     f"🚀 已添加 {api2_plancode} ({datacenter}) 到购买队列", 
                     "config_sniper")
                 
-                # 发送 Telegram 通知
+                # 发送加入队列TG通知
                 send_telegram_msg(
-                    f"🎯 配置狙击触发！\n"
+                    f"🎯 自动下单触发！\n"
                     f"源型号: {task['api1_planCode']}\n"
-                    f"绑定配置: {format_memory_display(bound_config['memory'])} + {format_storage_display(bound_config['storage'])}\n"
-                    f"下单代号: {api2_plancode}\n"
-                    f"机房: {datacenter} ({availability})\n"
-                    f"已加入购买队列..."
+                    f"绑定配置: {format_config_display(bound_config['memory'], bound_config['storage'])}\n"
+                    f"下单型号: {api2_plancode}\n"
+                    f"实际配置: {format_config_display(item_memory, item_storage)}\n"
+                    f"机房: {datacenter}\n"
+                    f"库存状态: {availability}\n"
+                    f"✅ 已加入购买队列"
                 )
     except Exception as e:
         raise e
@@ -2910,10 +2971,10 @@ def handle_matched_task(task):
         save_config_sniper_tasks()
         add_log("INFO", f"✅ 任务完成！{task['api1_planCode']} 已加入购买队列，停止监控", "config_sniper")
         send_telegram_msg(
-            f"✅ 配置狙击任务完成！\n"
-            f"型号: {task['api1_planCode']}\n"
-            f"配置: {format_memory_display(bound_config['memory'])} + {format_storage_display(bound_config['storage'])}\n"
-            f"已加入购买队列，任务已自动完成"
+            f"🎉 配置狙击任务完成！\n"
+            f"源型号: {task['api1_planCode']}\n"
+            f"绑定配置: {format_config_display(bound_config['memory'], bound_config['storage'])}\n"
+            f"✅ 已加入购买队列，任务自动完成"
         )
 
 def start_config_sniper_monitor():
