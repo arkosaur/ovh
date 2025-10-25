@@ -126,7 +126,7 @@ const ServerControlPage: React.FC = () => {
   const [showInstallProgress, setShowInstallProgress] = useState(false);
   const [installProgress, setInstallProgress] = useState<InstallProgress | null>(null);
   const [installCompleted, setInstallCompleted] = useState(false); // 标记安装是否已完成
-  const [autoCloseCountdown, setAutoCloseCountdown] = useState(5); // 自动关闭倒计时
+  const [autoCloseCountdown, setAutoCloseCountdown] = useState(8); // 自动关闭倒计时
   const [installPollingInterval, setInstallPollingInterval] = useState<NodeJS.Timeout | null>(null);
   const installProgressRef = useRef<InstallProgress | null>(null); // 用于在定时器回调中访问最新状态
   const completionToastShownRef = useRef<boolean>(false); // 防止重复显示完成提示
@@ -381,10 +381,10 @@ const ServerControlPage: React.FC = () => {
             
             // 设置完成状态，显示完成页面
             setInstallCompleted(true);
-            setAutoCloseCountdown(5); // 重置倒计时
+            setAutoCloseCountdown(8); // 重置倒计时
             
             // 启动倒计时（每秒减1）
-            let countdown = 5;
+            let countdown = 8;
             const countdownInterval = setInterval(() => {
               countdown--;
               setAutoCloseCountdown(countdown);
@@ -478,7 +478,7 @@ const ServerControlPage: React.FC = () => {
     // 重置完成提示标志（开始新的安装）
     completionToastShownRef.current = false;
     setInstallCompleted(false);
-    setAutoCloseCountdown(5);
+    setAutoCloseCountdown(8);
     
     // 如果没有现有进度数据，清空（避免闪烁）
     // 如果有现有数据，保留它（用于恢复进度显示）
@@ -516,7 +516,7 @@ const ServerControlPage: React.FC = () => {
     setShowInstallProgress(false);
     setInstallProgress(null);
     setInstallCompleted(false);
-    setAutoCloseCountdown(5);
+    setAutoCloseCountdown(8);
     installProgressRef.current = null; // 清空ref
     completionToastShownRef.current = false; // 重置标志
   };
@@ -1538,8 +1538,8 @@ const ServerControlPage: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className={`bg-cyber-dark border border-cyber-accent rounded-lg p-6 max-w-3xl w-full ${
-                installCompleted ? '' : 'max-h-[80vh] overflow-y-auto'
+              className={`bg-cyber-dark border border-cyber-accent rounded-lg max-w-3xl w-full ${
+                installCompleted ? 'p-6 overflow-hidden' : 'p-6 max-h-[80vh] overflow-y-auto'
               }`}>
               
               <div className="flex items-center justify-between mb-6">
@@ -1547,19 +1547,21 @@ const ServerControlPage: React.FC = () => {
                   <HardDrive className="w-6 h-6 text-cyber-accent" />
                   <h2 className="text-2xl font-bold text-cyber-text">系统安装进度</h2>
                 </div>
-                <button
-                  onClick={closeInstallProgress}
-                  className="p-2 hover:bg-cyber-grid/50 rounded-lg transition-all text-cyber-muted hover:text-cyber-text">
-                  <X className="w-5 h-5" />
-                </button>
+                {!installCompleted && (
+                  <button
+                    onClick={closeInstallProgress}
+                    className="p-2 hover:bg-cyber-grid/50 rounded-lg transition-all text-cyber-muted hover:text-cyber-text">
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
               </div>
 
               {installCompleted ? (
                 // 安装完成页面 - 在同一模态框内显示
-                <div className="flex flex-col items-center justify-center py-16 px-8">
+                <div className="flex flex-col items-center justify-center py-6 px-8">
                   {/* 成功图标 - 带脉冲动画 */}
                   <motion.div 
-                    className="mb-6 relative"
+                    className="mb-4 relative"
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: "spring", duration: 0.6 }}>
@@ -1576,22 +1578,7 @@ const ServerControlPage: React.FC = () => {
                   <h3 className="text-3xl font-bold text-cyber-text mb-2">
                     安装完成
                   </h3>
-                  <p className="text-cyber-muted text-sm mb-8">系统已成功部署，请查收邮件获取登录信息</p>
-
-                  {/* 底部操作区 */}
-                  <div className="flex flex-col items-center gap-4">
-                    {/* 关闭按钮 */}
-                    <button
-                      onClick={closeInstallProgress}
-                      className="px-10 py-3 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/90 transition-all font-medium shadow-lg shadow-cyber-accent/20 hover:shadow-cyber-accent/40">
-                      立即关闭
-                    </button>
-                    
-                    {/* 倒计时提示 */}
-                    <p className="text-xs text-cyber-muted/70">
-                      {autoCloseCountdown} 秒后自动关闭
-                    </p>
-                  </div>
+                  <p className="text-cyber-muted text-sm">系统已成功部署，请查收邮件获取登录信息</p>
                 </div>
               ) : !installProgress ? (
                 // 加载中
