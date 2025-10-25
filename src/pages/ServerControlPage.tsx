@@ -1553,70 +1553,83 @@ const ServerControlPage: React.FC = () => {
               </div>
 
               {installCompleted ? (
-                // 安装完成页面
-                <div className="flex flex-col items-center justify-center py-12 px-6">
-                  {/* 成功图标 */}
-                  <div className="mb-6 relative">
-                    <div className="w-24 h-24 rounded-full bg-green-500/20 border-4 border-green-500 flex items-center justify-center">
-                      <svg className="w-12 h-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                // 安装完成页面 - 优雅版
+                <div className="flex flex-col items-center justify-center py-16 px-8">
+                  {/* 成功图标 - 带脉冲动画 */}
+                  <motion.div 
+                    className="mb-8 relative"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", duration: 0.6 }}>
+                    {/* 外圈脉冲效果 */}
+                    <div className="absolute inset-0 rounded-full bg-green-500/20 animate-ping" style={{ animationDuration: '2s' }}></div>
+                    <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-lg shadow-green-500/50">
+                      <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                       </svg>
                     </div>
-                  </div>
+                  </motion.div>
 
                   {/* 标题 */}
-                  <h3 className="text-2xl font-bold text-cyber-text mb-3">
-                    ✅ 系统安装完成！
+                  <h3 className="text-3xl font-bold text-cyber-text mb-2">
+                    安装完成
                   </h3>
+                  <p className="text-cyber-muted text-sm mb-8">系统已成功部署，请查收邮件获取登录信息</p>
 
-                  {/* 邮件提示 */}
-                  <div className="w-full max-w-md mb-6">
-                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-6">
-                      <div className="flex items-start gap-3 mb-4">
-                        <Mail className="w-6 h-6 text-blue-400 flex-shrink-0 mt-1" />
+                  {/* 邮件信息卡片 - 优雅简洁版 */}
+                  <div className="w-full max-w-lg mb-8">
+                    <div className="bg-cyber-grid/10 border border-cyber-accent/30 rounded-xl p-6 backdrop-blur-sm">
+                      {/* 邮件图标和标题 */}
+                      <div className="flex items-center gap-3 mb-5 pb-4 border-b border-cyber-accent/20">
+                        <div className="w-10 h-10 rounded-lg bg-cyber-accent/20 flex items-center justify-center">
+                          <Mail className="w-5 h-5 text-cyber-accent" />
+                        </div>
                         <div>
-                          <h4 className="text-lg font-semibold text-blue-400 mb-2">
-                            📧 请查收OVH邮件
-                          </h4>
-                          <p className="text-cyber-muted text-sm mb-3">
-                            OVH已向您的注册邮箱发送安装完成通知，邮件包含：
-                          </p>
-                          <ul className="space-y-2 text-sm text-cyber-text">
-                            <li className="flex items-start gap-2">
-                              <span className="text-cyber-accent">•</span>
-                              <span><strong className="text-cyber-accent">Root登录密码</strong> - 首次登录凭证</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                              <span className="text-cyber-accent">•</span>
-                              <span><strong className="text-cyber-accent">服务器IP地址</strong> - SSH远程连接地址</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                              <span className="text-cyber-accent">•</span>
-                              <span><strong className="text-cyber-accent">安装详细日志</strong> - 完整的系统配置信息</span>
-                            </li>
-                          </ul>
+                          <h4 className="text-lg font-semibold text-cyber-text">请查收OVH邮件</h4>
+                          <p className="text-xs text-cyber-muted">邮件包含重要的服务器登录信息</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-cyber-muted bg-cyber-dark/50 rounded p-3">
-                        <AlertCircle className="w-4 h-4" />
-                        <span>如未收到邮件，请检查垃圾邮件箱或联系OVH客服</span>
+                      
+                      {/* 邮件内容列表 */}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3 text-sm">
+                          <div className="w-1.5 h-1.5 rounded-full bg-cyber-accent"></div>
+                          <span className="text-cyber-text"><span className="text-cyber-accent font-medium">Root密码</span> - 首次登录凭证</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm">
+                          <div className="w-1.5 h-1.5 rounded-full bg-cyber-accent"></div>
+                          <span className="text-cyber-text"><span className="text-cyber-accent font-medium">服务器IP</span> - SSH远程连接地址</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm">
+                          <div className="w-1.5 h-1.5 rounded-full bg-cyber-accent"></div>
+                          <span className="text-cyber-text"><span className="text-cyber-accent font-medium">安装日志</span> - 完整的系统配置</span>
+                        </div>
+                      </div>
+
+                      {/* 底部提示 */}
+                      <div className="mt-5 pt-4 border-t border-cyber-accent/20 flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-cyber-muted flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-cyber-muted leading-relaxed">
+                          如未收到邮件，请检查垃圾邮件箱
+                        </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* 倒计时提示 */}
-                  <div className="text-center mb-4">
-                    <p className="text-sm text-cyber-muted">
-                      窗口将在 <span className="text-cyber-accent font-bold text-lg">{autoCloseCountdown}</span> 秒后自动关闭
+                  {/* 底部操作区 */}
+                  <div className="flex flex-col items-center gap-4">
+                    {/* 关闭按钮 */}
+                    <button
+                      onClick={closeInstallProgress}
+                      className="px-10 py-3 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/90 transition-all font-medium shadow-lg shadow-cyber-accent/20 hover:shadow-cyber-accent/40">
+                      立即关闭
+                    </button>
+                    
+                    {/* 倒计时提示 */}
+                    <p className="text-xs text-cyber-muted/70">
+                      {autoCloseCountdown} 秒后自动关闭
                     </p>
                   </div>
-
-                  {/* 关闭按钮 */}
-                  <button
-                    onClick={closeInstallProgress}
-                    className="px-8 py-3 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 transition-all font-semibold">
-                    立即关闭
-                  </button>
                 </div>
               ) : !installProgress ? (
                 // 加载中
