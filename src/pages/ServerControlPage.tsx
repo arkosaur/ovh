@@ -248,32 +248,33 @@ const ServerControlPage: React.FC = () => {
   const openReinstallDialog = async (server: ServerInfo) => {
     setSelectedServer(server);
     
-    // 先检查是否有正在进行的安装（404视为正常，不抛出错误）
+    // 先检查是否有正在进行的安装
     try {
-      const response = await api.get(`/server-control/${server.serviceName}/install/status`, {
-        validateStatus: (status) => status === 200 || status === 404  // 200和404都视为成功
-      });
+      const response = await api.get(`/server-control/${server.serviceName}/install/status`);
       
-      // 如果是404，说明没有安装进度，继续打开重装对话框
-      if (response.status === 404) {
-        // 静默处理，继续执行下面的代码
-      } else if (response.data.success) {
-        const progress = response.data.status;
-        
-        // 如果有正在进行的安装（未完成且无错误）
-        if (!progress.allDone && !progress.hasError && progress.totalSteps > 0) {
-          // 设置初始进度数据
-          setInstallProgress(progress);
+      if (response.data.success) {
+        // 检查是否有安装进度
+        if (response.data.hasInstallation === false) {
+          // 没有正在进行的安装，继续打开重装对话框
+          // 静默处理，不显示任何提示
+        } else if (response.data.status) {
+          const progress = response.data.status;
           
-          // 启动轮询（会自动显示进度窗口）
-          startInstallProgressMonitoring();
-          
-          showToast({ 
-            type: 'info', 
-            title: `检测到正在进行的安装 (${progress.progressPercentage}%)` 
-          });
-          
-          return; // 不打开重装对话框
+          // 如果有正在进行的安装（未完成且无错误）
+          if (!progress.allDone && !progress.hasError && progress.totalSteps > 0) {
+            // 设置初始进度数据
+            setInstallProgress(progress);
+            
+            // 启动轮询（会自动显示进度窗口）
+            startInstallProgressMonitoring();
+            
+            showToast({ 
+              type: 'info', 
+              title: `检测到正在进行的安装 (${progress.progressPercentage}%)` 
+            });
+            
+            return; // 不打开重装对话框
+          }
         }
       }
     } catch (error: any) {
@@ -348,44 +349,47 @@ const ServerControlPage: React.FC = () => {
       const response = await api.get(`/server-control/${selectedServer.serviceName}/install/status`);
       
       if (response.data.success) {
-        const progress = response.data.status;
-        setInstallProgress(progress);
-        
-        // 如果安装完成或出错，停止轮询
-        if (progress.allDone || progress.hasError) {
+        // 检查是否有安装进度
+        if (response.data.hasInstallation === false) {
+          // 没有安装任务了，说明安装完成
           stopInstallProgressMonitoring();
           
-          if (progress.allDone) {
-            showToast({ type: 'success', title: '系统安装完成！' });
-          } else if (progress.hasError) {
-            showToast({ type: 'error', title: '系统安装出错' });
+          // 判断：如果之前有进度数据，说明安装刚完成
+          if (installProgress && installProgress.progressPercentage > 0) {
+            showToast({ 
+              type: 'success', 
+              title: '✅ 系统安装完成！',
+              message: '服务器已成功安装系统'
+            });
+          }
+          
+          return;
+        }
+        
+        // 有安装进度数据
+        if (response.data.status) {
+          const progress = response.data.status;
+          setInstallProgress(progress);
+          
+          // 如果安装完成或出错，停止轮询
+          if (progress.allDone || progress.hasError) {
+            stopInstallProgressMonitoring();
+            
+            if (progress.allDone) {
+              showToast({ type: 'success', title: '系统安装完成！' });
+            } else if (progress.hasError) {
+              showToast({ type: 'error', title: '系统安装出错' });
+            }
           }
         }
       }
     } catch (error: any) {
-      // 如果API返回404，说明没有安装任务
-      if (error.response?.status === 404) {
-        stopInstallProgressMonitoring();
-        
-        // 判断：如果之前有进度数据，说明安装刚完成
-        if (installProgress && installProgress.progressPercentage > 0) {
-          showToast({ 
-            type: 'success', 
-            title: '✅ 系统安装完成！',
-            message: '服务器已成功安装系统'
-          });
-        }
-        // 如果之前没有进度数据，说明本来就没有安装（正常情况）
-        
-        return; // 404是正常情况，不显示错误日志
-      }
-      
-      // 如果是500错误，也停止轮询
+      // 网络错误或500错误
       if (error.response?.status === 500) {
         stopInstallProgressMonitoring();
       }
       
-      // 只有非404/500错误才记录日志
+      // 记录错误日志
       console.error('获取安装进度失败:', error);
     }
   };

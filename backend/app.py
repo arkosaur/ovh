@@ -3518,12 +3518,12 @@ def get_install_status(service_name):
         
         if is_no_install:
             add_log("INFO", f"服务器 {service_name} 当前没有正在进行的安装 (原因: {error_message[:100]})", "server_control")
-            # 返回404，让前端知道没有安装进度
+            # 返回200状态码，但标记没有安装进度（避免浏览器显示404错误）
             return jsonify({
-                "success": False, 
-                "error": "No installation in progress",
+                "success": True,
+                "hasInstallation": False,  # 标记：没有正在进行的安装
                 "message": "当前没有正在进行的安装"
-            }), 404
+            }), 200
         
         # 其他错误返回500
         add_log("ERROR", f"获取服务器 {service_name} 安装进度失败: [{error_type}] {error_message}", "server_control")
