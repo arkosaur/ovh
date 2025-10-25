@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/utils/apiClient";
 import { useToast } from "../components/ToastContainer";
@@ -126,6 +126,7 @@ const ServerControlPage: React.FC = () => {
   const [showInstallProgress, setShowInstallProgress] = useState(false);
   const [installProgress, setInstallProgress] = useState<InstallProgress | null>(null);
   const [installPollingInterval, setInstallPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  const installProgressRef = useRef<InstallProgress | null>(null); // 用于在定时器回调中访问最新状态
 
   // Task 1: 获取服务器列表（只显示活跃服务器）
   const fetchServers = async () => {
@@ -348,19 +349,30 @@ const ServerControlPage: React.FC = () => {
     try {
       const response = await api.get(`/server-control/${selectedServer.serviceName}/install/status`);
       
+      console.log('[fetchInstallProgress] 响应数据:', response.data);
+      
       if (response.data.success) {
         // 检查是否有安装进度
         if (response.data.hasInstallation === false) {
+          console.log('[fetchInstallProgress] 检测到安装完成, installProgress:', installProgress);
+          
           // 没有安装任务了，说明安装完成
           stopInstallProgressMonitoring();
           
           // 判断：如果之前有进度数据，说明安装刚完成
-          if (installProgress && installProgress.progressPercentage > 0) {
+          // 使用ref获取最新状态，而不是闭包中的旧状态
+          const latestProgress = installProgressRef.current;
+          console.log('[fetchInstallProgress] 最新进度状态:', latestProgress);
+          
+          if (latestProgress && latestProgress.progressPercentage > 0) {
+            console.log('[fetchInstallProgress] 显示安装完成提示');
             showToast({ 
               type: 'success', 
               title: '✅ 系统安装完成！',
               message: '服务器已成功安装系统'
             });
+          } else {
+            console.log('[fetchInstallProgress] 没有之前的进度数据，不显示提示');
           }
           
           return;
@@ -370,6 +382,7 @@ const ServerControlPage: React.FC = () => {
         if (response.data.status) {
           const progress = response.data.status;
           setInstallProgress(progress);
+          installProgressRef.current = progress; // 同步更新ref
           
           // 如果安装完成或出错，停止轮询
           if (progress.allDone || progress.hasError) {
@@ -380,6 +393,9 @@ const ServerControlPage: React.FC = () => {
             } else if (progress.hasError) {
               showToast({ type: 'error', title: '系统安装出错' });
             }
+          } else {
+            // 根据进度动态调整轮询间隔
+            adjustPollingInterval(progress.progressPercentage);
           }
         }
       }
@@ -391,6 +407,33 @@ const ServerControlPage: React.FC = () => {
       
       // 记录错误日志
       console.error('获取安装进度失败:', error);
+    }
+  };
+
+  // 动态调整轮询间隔
+  const adjustPollingInterval = (progressPercentage: number) => {
+    if (!installPollingInterval) return;
+    
+    let newInterval = 5000; // 默认5秒
+    
+    if (progressPercentage >= 90) {
+      newInterval = 1000; // 90%以上：1秒（最快）
+      console.log('[轮询] 进度>=90%，切换到1秒轮询');
+    } else if (progressPercentage >= 80) {
+      newInterval = 2000; // 80-89%：2秒（加快）
+      console.log('[轮询] 进度>=80%，切换到2秒轮询');
+    } else if (progressPercentage >= 70) {
+      newInterval = 3000; // 70-79%：3秒
+    }
+    
+    // 如果间隔需要改变，重新设置定时器
+    const currentInterval = installPollingInterval as any;
+    if (currentInterval._idleTimeout !== newInterval) {
+      clearInterval(installPollingInterval!);
+      const interval = setInterval(() => {
+        fetchInstallProgress();
+      }, newInterval);
+      setInstallPollingInterval(interval);
     }
   };
 
@@ -408,12 +451,15 @@ const ServerControlPage: React.FC = () => {
     // 如果有现有数据，保留它（用于恢复进度显示）
     if (!installProgress) {
       setInstallProgress(null);
+      installProgressRef.current = null;
+    } else {
+      installProgressRef.current = installProgress;
     }
     
     // 立即获取一次进度
     fetchInstallProgress();
     
-    // 每5秒轮询一次
+    // 初始轮询间隔：5秒（会根据进度动态调整）
     const interval = setInterval(() => {
       fetchInstallProgress();
     }, 5000);
@@ -427,6 +473,8 @@ const ServerControlPage: React.FC = () => {
       clearInterval(installPollingInterval);
       setInstallPollingInterval(null);
     }
+    // 清空ref状态（下次安装时重新开始）
+    // 注意：不清空installProgress state，让窗口保持显示最后的进度
   };
 
   // 安装进度：手动关闭进度模态框
@@ -434,6 +482,7 @@ const ServerControlPage: React.FC = () => {
     stopInstallProgressMonitoring();
     setShowInstallProgress(false);
     setInstallProgress(null);
+    installProgressRef.current = null; // 清空ref
   };
 
   // 清理：组件卸载时停止轮询
