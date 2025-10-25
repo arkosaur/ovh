@@ -71,10 +71,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         {confirmDialog && (
           <>
             <div
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999]"
               onClick={() => handleConfirm(false)}
             />
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
               <div className="bg-cyber-dark border-2 border-cyber-accent/50 rounded-lg p-6 max-w-md w-full shadow-neon-lg">
                 <h3 className="text-xl font-bold text-cyber-text mb-2">
                   {confirmDialog.options.title}

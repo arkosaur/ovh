@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/utils/apiClient";
 import { useToast } from "../components/ToastContainer";
@@ -1101,16 +1102,17 @@ const ServerControlPage: React.FC = () => {
       </motion.div>
 
       {/* Task 3: 重装系统对话框 */}
-      <AnimatePresence>
-        {showReinstallDialog && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="cyber-card max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
+      {createPortal(
+        <AnimatePresence>
+          {showReinstallDialog && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="cyber-card max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
                   <HardDrive className="w-5 h-5 text-orange-400" />
                   <h3 className="text-xl font-semibold text-cyber-text">
                     重装系统 - {selectedServer?.name}
@@ -1132,15 +1134,9 @@ const ServerControlPage: React.FC = () => {
                   <label className="block text-cyber-text font-medium mb-2">操作系统模板</label>
                   <select
                     value={selectedTemplate}
-                    onChange={async (e) => {
+                    onChange={(e) => {
                       const template = e.target.value;
                       setSelectedTemplate(template);
-                      if (template && selectedServer) {
-                        await fetchPartitionSchemes(selectedServer.serviceName, template);
-                      } else {
-                        setPartitionSchemes([]);
-                        setSelectedScheme("");
-                      }
                     }}
                     className="w-full px-4 py-3 bg-cyber-bg border-2 border-cyber-accent/40 rounded-lg text-cyber-text focus:border-cyber-accent focus:ring-2 focus:ring-cyber-accent/30 hover:border-cyber-accent/60 transition-all cursor-pointer"
                     style={{
@@ -1161,80 +1157,6 @@ const ServerControlPage: React.FC = () => {
                     ))}
                   </select>
                 </div>
-
-                {/* 分区方案加载状态 */}
-                {loadingPartitions && (
-                  <div className="p-3 bg-cyber-grid/30 border border-cyber-accent/20 rounded-lg">
-                    <div className="flex items-center gap-2 text-cyber-text text-sm">
-                      <RefreshCw className="w-4 h-4 animate-spin text-cyber-accent" />
-                      正在加载分区方案...
-                    </div>
-                  </div>
-                )}
-
-                {/* 分区方案选择 */}
-                {!loadingPartitions && partitionSchemes.length > 0 && (
-                  <div>
-                    <label className="block text-cyber-text font-medium mb-2">分区方案（可选）</label>
-                    <select
-                      value={selectedScheme}
-                      onChange={(e) => setSelectedScheme(e.target.value)}
-                      className="w-full px-4 py-3 bg-cyber-bg border-2 border-cyber-accent/40 rounded-lg text-cyber-text focus:border-cyber-accent focus:ring-2 focus:ring-cyber-accent/30 hover:border-cyber-accent/60 transition-all cursor-pointer"
-                      style={{
-                        background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)'
-                      }}>
-                      <option value="" className="bg-cyber-bg text-cyber-muted">使用默认分区（推荐）</option>
-                      {partitionSchemes.map((scheme) => (
-                        <option 
-                          key={scheme.name} 
-                          value={scheme.name}
-                          className="bg-cyber-bg text-cyber-text py-2"
-                          style={{
-                            background: 'rgba(15, 23, 42, 0.98)',
-                            padding: '8px 12px'
-                          }}>
-                          {scheme.name} ({scheme.partitions.length} 个分区)
-                        </option>
-                      ))}
-                    </select>
-                    
-                    {/* 查看分区详情按钮 */}
-                    <button
-                      type="button"
-                      onClick={() => setShowPartitionDetails(!showPartitionDetails)}
-                      className="mt-2 text-sm text-cyber-accent hover:text-cyber-accent/80 underline">
-                      {showPartitionDetails ? '隐藏' : '查看'}分区详情
-                    </button>
-
-                    {/* 分区详情 */}
-                    {showPartitionDetails && selectedScheme && (
-                      <div className="mt-3 p-3 bg-cyber-grid/30 border border-cyber-accent/20 rounded-lg">
-                        <div className="text-sm text-cyber-text">
-                          {partitionSchemes.find(s => s.name === selectedScheme)?.partitions.map((partition, idx) => (
-                            <div key={idx} className="mb-2 pb-2 border-b border-cyber-accent/10 last:border-0">
-                              <div className="flex justify-between">
-                                <span className="font-mono text-cyber-accent">{partition.mountpoint}</span>
-                                <span className="text-cyber-muted">
-                                  {typeof partition.size === 'object' && partition.size?.value 
-                                    ? `${partition.size.value} ${partition.size.unit || 'MB'}`
-                                    : `${partition.size || 0} MB`
-                                  }
-                                </span>
-                              </div>
-                              <div className="text-xs text-cyber-muted mt-1">
-                                {partition.filesystem} | {partition.type} | RAID: {
-                                  typeof partition.raid === 'object' && partition.raid !== null && 'value' in partition.raid
-                                    ? (partition.raid as any).value 
-                                    : (partition.raid || 'N/A')
-                                }
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 <div>
                   <label className="block text-cyber-text font-medium mb-2">自定义主机名（可选）</label>
@@ -1282,21 +1204,24 @@ const ServerControlPage: React.FC = () => {
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
 
       {/* Task 4: 任务列表对话框 */}
-      <AnimatePresence>
-        {showTasksDialog && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="cyber-card max-w-3xl w-full max-h-[80vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-cyber-accent" />
-                  <h3 className="text-xl font-semibold text-cyber-text">
+      {createPortal(
+        <AnimatePresence>
+          {showTasksDialog && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="cyber-card max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-cyber-accent" />
+                    <h3 className="text-xl font-semibold text-cyber-text">
                     任务列表 - {selectedServer?.name}
                   </h3>
                 </div>
@@ -1362,19 +1287,22 @@ const ServerControlPage: React.FC = () => {
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
 
       {/* Task 10: 启动模式对话框 */}
-      <AnimatePresence>
-        {showBootModeDialog && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="cyber-card max-w-2xl w-full">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
+      {createPortal(
+        <AnimatePresence>
+          {showBootModeDialog && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="cyber-card max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
                   <HardDrive className="w-5 h-5 text-orange-400" />
                   <h3 className="text-xl font-semibold text-cyber-text">
                     启动模式 - {selectedServer?.name}
@@ -1429,21 +1357,24 @@ const ServerControlPage: React.FC = () => {
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
 
       {/* IPMI倒计时加载模态框 */}
-      <AnimatePresence>
-        {ipmiLoading && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-cyber-dark border border-cyber-accent rounded-lg p-8 max-w-md w-full text-center">
-              
-              <div className="flex justify-center mb-6">
-                <div className="relative">
-                  <div className="w-24 h-24 rounded-full border-4 border-cyber-accent/30"></div>
+      {createPortal(
+        <AnimatePresence>
+          {ipmiLoading && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-2 sm:p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-cyber-dark border border-cyber-accent rounded-lg p-8 max-w-md w-full text-center">
+                
+                <div className="flex justify-center mb-6">
+                  <div className="relative">
+                    <div className="w-24 h-24 rounded-full border-4 border-cyber-accent/30"></div>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="text-4xl font-bold text-cyber-accent">{ipmiCountdown}</span>
                   </div>
@@ -1476,22 +1407,25 @@ const ServerControlPage: React.FC = () => {
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
 
       {/* IPMI链接模态框 */}
-      <AnimatePresence>
-        {showIpmiLinkDialog && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-cyber-dark border border-cyber-accent rounded-lg p-6 max-w-2xl w-full">
-              
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Monitor className="w-6 h-6 text-cyber-accent" />
-                  <h2 className="text-xl font-bold text-cyber-text">IPMI控制台</h2>
+      {createPortal(
+        <AnimatePresence>
+          {showIpmiLinkDialog && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-2 sm:p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-cyber-dark border border-cyber-accent rounded-lg p-6 max-w-2xl w-full">
+                
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Monitor className="w-6 h-6 text-cyber-accent" />
+                    <h2 className="text-xl font-bold text-cyber-text">IPMI控制台</h2>
                 </div>
                 <button
                   onClick={() => setShowIpmiLinkDialog(false)}
@@ -1528,24 +1462,27 @@ const ServerControlPage: React.FC = () => {
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
 
       {/* 安装进度模态框 */}
-      <AnimatePresence>
-        {showInstallProgress && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className={`bg-cyber-dark border border-cyber-accent rounded-lg max-w-3xl w-full ${
-                installCompleted ? 'p-6 overflow-hidden' : 'p-6 max-h-[80vh] overflow-y-auto'
-              }`}>
-              
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <HardDrive className="w-6 h-6 text-cyber-accent" />
-                  <h2 className="text-2xl font-bold text-cyber-text">系统安装进度</h2>
+      {createPortal(
+        <AnimatePresence>
+          {showInstallProgress && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-2 sm:p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className={`bg-cyber-dark border border-cyber-accent rounded-lg max-w-3xl w-full ${
+                  installCompleted ? 'p-6 overflow-hidden' : 'p-6 max-h-[90vh] overflow-y-auto'
+                }`}>
+                
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <HardDrive className="w-6 h-6 text-cyber-accent" />
+                    <h2 className="text-2xl font-bold text-cyber-text">系统安装进度</h2>
                 </div>
                 {!installCompleted && (
                   <button
@@ -1716,7 +1653,9 @@ const ServerControlPage: React.FC = () => {
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
 
     </div>
   );
