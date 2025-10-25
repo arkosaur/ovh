@@ -3232,14 +3232,12 @@ def install_os(service_name):
     try:
         # 构建安装参数 - OVH API格式
         install_params = {
-            'templateName': template_name
+            'operatingSystem': template_name  # OVH API正确的参数名
         }
         
-        # 自定义主机名 - 只在有值时才添加details
+        # 自定义主机名 - 只在有值时才添加
         if data.get('customHostname'):
-            install_params['details'] = {
-                'customHostname': data['customHostname']
-            }
+            install_params['customHostname'] = data['customHostname']
             add_log("INFO", f"设置自定义主机名: {data['customHostname']}", "server_control")
         
         # 使用默认分区配置（不传storage参数）
@@ -3251,38 +3249,52 @@ def install_os(service_name):
         add_log("INFO", f"  - 模板: {template_name}", "server_control")
         add_log("INFO", f"  - 参数: {install_params}", "server_control")
         
-        # 尝试多种OVH API调用方式
+        # 使用requests直接调用OVH API（绕过SDK问题）
+        add_log("INFO", f"使用requests直接调用OVH API", "server_control")
         
-        # 方案1: 尝试使用 installationMedia (通过查询已有服务器安装方法推测)
-        try:
-            add_log("INFO", f"方案1: 尝试 /dedicated/server/{service_name}/install/start", "server_control")
-            result = client.post(
-                f'/dedicated/server/{service_name}/install/start',
-                templateName=template_name
-            )
-            add_log("INFO", "方案1成功！", "server_control")
-        except Exception as e1:
-            add_log("WARNING", f"方案1失败: {str(e1)}", "server_control")
-            
-            # 方案2: 尝试 task 创建方式
-            try:
-                add_log("INFO", f"方案2: 尝试通过task创建安装任务", "server_control")
-                result = client.post(
-                    f'/dedicated/server/{service_name}/task',
-                    function='reinstallServer',
-                    comment=f'Installing {template_name}'
-                )
-                add_log("INFO", "方案2成功！", "server_control")
-            except Exception as e2:
-                add_log("WARNING", f"方案2失败: {str(e2)}", "server_control")
-                
-                # 方案3: 直接安装（最简单方式）
-                add_log("INFO", f"方案3: 尝试直接POST到 /dedicated/server/{service_name}/install", "server_control")
-                result = client.post(
-                    f'/dedicated/server/{service_name}/install',
-                    templateName=template_name
-                )
-                add_log("INFO", "方案3成功！", "server_control")
+        import requests as req
+        import time
+        import hashlib
+        
+        # 构建完整URL - 使用reinstall端点
+        api_url = f"https://eu.api.ovh.com/1.0/dedicated/server/{service_name}/reinstall"
+        
+        # 获取认证信息
+        app_key = config.get('appKey', '')
+        app_secret = config.get('appSecret', '')
+        consumer_key = config.get('consumerKey', '')
+        
+        # 生成签名
+        timestamp = str(int(time.time()))
+        method = "POST"
+        body = json.dumps(install_params)
+        
+        # OVH签名格式: $1$+SHA1($AS+$CK+$METHOD+$QUERY+$BODY+$TSTAMP)
+        pre_hash = f"{app_secret}+{consumer_key}+{method}+{api_url}+{body}+{timestamp}"
+        signature = "$1$" + hashlib.sha1(pre_hash.encode()).hexdigest()
+        
+        headers = {
+            'X-Ovh-Application': app_key,
+            'X-Ovh-Consumer': consumer_key,
+            'X-Ovh-Timestamp': timestamp,
+            'X-Ovh-Signature': signature,
+            'Content-Type': 'application/json'
+        }
+        
+        add_log("INFO", f"POST {api_url}", "server_control")
+        add_log("INFO", f"Body: {body}", "server_control")
+        
+        response = req.post(api_url, headers=headers, data=body, timeout=30)
+        
+        if response.status_code in [200, 201]:
+            result = response.json()
+            add_log("INFO", f"安装请求成功: {result}", "server_control")
+        else:
+            add_log("ERROR", f"API返回错误: {response.status_code} - {response.text}", "server_control")
+            return jsonify({
+                "success": False,
+                "error": f"OVH API错误: {response.text}"
+            }), response.status_code
         
         add_log("INFO", f"服务器 {service_name} 系统重装请求已发送，模板: {template_name}", "server_control")
         
@@ -3611,6 +3623,243 @@ def get_partition_schemes(service_name):
         return jsonify({"success": True, "schemes": scheme_details})
     except Exception as e:
         add_log("ERROR", f"[Partition] 获取分区方案失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/console', methods=['GET', 'OPTIONS'])
+def get_ipmi_console(service_name):
+    """获取IPMI/KVM控制台访问"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        add_log("INFO", f"[IPMI] 获取服务器 {service_name} IPMI信息", "server_control")
+        
+        # 获取IPMI功能信息
+        ipmi_info = client.get(f'/dedicated/server/{service_name}/features/ipmi')
+        add_log("INFO", f"[IPMI] IPMI信息: {ipmi_info}", "server_control")
+        
+        # 根据服务器支持的特性选择访问类型
+        supported_features = ipmi_info.get('supportedFeatures', {})
+        access_type = None
+        
+        if supported_features.get('kvmipHtml5URL'):
+            access_type = 'kvmipHtml5URL'
+        elif supported_features.get('kvmipJnlp'):
+            access_type = 'kvmipJnlp'
+        elif supported_features.get('serialOverLanURL'):
+            access_type = 'serialOverLanURL'
+        else:
+            add_log("ERROR", f"[IPMI] 服务器不支持任何KVM访问类型", "server_control")
+            return jsonify({
+                "success": False, 
+                "error": "服务器不支持KVM控制台访问"
+            }), 400
+        
+        # 请求KVM控制台访问
+        add_log("INFO", f"[IPMI] 请求KVM控制台访问，类型: {access_type}", "server_control")
+        console_access = client.post(
+            f'/dedicated/server/{service_name}/features/ipmi/access',
+            type=access_type
+        )
+        
+        add_log("INFO", f"[IPMI] 控制台访问创建成功: {console_access}", "server_control")
+        
+        return jsonify({
+            "success": True,
+            "ipmi": ipmi_info,
+            "console": console_access,
+            "accessType": access_type
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"[IPMI] 获取IPMI控制台失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/boot-mode', methods=['GET', 'OPTIONS'])
+def get_boot_modes(service_name):
+    """获取可用的启动模式列表"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        add_log("INFO", f"[Boot] 获取服务器 {service_name} 启动模式列表", "server_control")
+        
+        # 获取服务器当前配置
+        server_info = client.get(f'/dedicated/server/{service_name}')
+        current_boot_id = server_info.get('bootId')
+        
+        # 获取所有可用的启动模式
+        boot_ids = client.get(f'/dedicated/server/{service_name}/boot')
+        
+        boot_modes = []
+        for boot_id in boot_ids:
+            boot_info = client.get(f'/dedicated/server/{service_name}/boot/{boot_id}')
+            boot_modes.append({
+                'id': boot_id,
+                'bootType': boot_info.get('bootType'),
+                'description': boot_info.get('description'),
+                'kernel': boot_info.get('kernel'),
+                'active': boot_id == current_boot_id
+            })
+        
+        add_log("INFO", f"[Boot] 找到 {len(boot_modes)} 个启动模式", "server_control")
+        
+        return jsonify({
+            "success": True,
+            "currentBootId": current_boot_id,
+            "bootModes": boot_modes
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"[Boot] 获取启动模式失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/boot-mode', methods=['PUT', 'OPTIONS'])
+def change_boot_mode(service_name):
+    """切换启动模式（如切换到Rescue模式）"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        data = request.get_json()
+        boot_id = data.get('bootId')
+        
+        if not boot_id:
+            return jsonify({"success": False, "error": "缺少bootId参数"}), 400
+        
+        add_log("INFO", f"[Boot] 切换服务器 {service_name} 启动模式到 {boot_id}", "server_control")
+        
+        # 修改服务器启动配置
+        result = client.put(
+            f'/dedicated/server/{service_name}',
+            bootId=boot_id
+        )
+        
+        add_log("INFO", f"[Boot] 启动模式切换成功，需要重启服务器生效", "server_control")
+        
+        return jsonify({
+            "success": True,
+            "message": "启动模式已切换，需要重启服务器生效",
+            "bootId": boot_id
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"[Boot] 切换启动模式失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/statistics', methods=['GET', 'OPTIONS'])
+def get_traffic_statistics(service_name):
+    """获取服务器流量统计"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        add_log("INFO", f"[Stats] 获取服务器 {service_name} 流量统计", "server_control")
+        
+        # 获取时间范围参数（默认最近24小时）
+        period = request.args.get('period', 'lastday')  # lastday, lastweek, lastmonth, lastyear
+        type_param = request.args.get('type', 'traffic:download')  # traffic:download, traffic:upload
+        
+        # 先检查是否支持statistics API
+        try:
+            # 尝试使用requests库直接调用（因为OVH SDK对这个API支持有问题）
+            import requests as req
+            
+            # 构建完整的API URL
+            api_url = f"https://eu.api.ovh.com/1.0/dedicated/server/{service_name}/statistics?period={period}&type={type_param}"
+            
+            # 获取OVH认证信息
+            app_key = config.get('appKey', '')
+            app_secret = config.get('appSecret', '')
+            consumer_key = config.get('consumerKey', '')
+            
+            headers = {
+                'X-Ovh-Application': app_key,
+                'X-Ovh-Consumer': consumer_key
+            }
+            
+            add_log("INFO", f"[Stats] 请求API: {api_url}", "server_control")
+            response = req.get(api_url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                stats = response.json()
+                add_log("INFO", f"[Stats] 流量统计获取成功，共 {len(stats)} 个数据点", "server_control")
+                
+                return jsonify({
+                    "success": True,
+                    "statistics": stats,
+                    "period": period,
+                    "type": type_param
+                })
+            else:
+                add_log("ERROR", f"[Stats] API返回错误: {response.status_code} - {response.text}", "server_control")
+                return jsonify({
+                    "success": False,
+                    "error": f"流量统计API不可用 (HTTP {response.status_code})"
+                }), 500
+                
+        except Exception as stats_error:
+            add_log("ERROR", f"[Stats] 流量统计API调用失败: {str(stats_error)}", "server_control")
+            
+            # 返回友好的错误提示
+            return jsonify({
+                "success": False,
+                "error": "该服务器可能不支持流量统计功能",
+                "details": str(stats_error)
+            }), 500
+        
+    except Exception as e:
+        add_log("ERROR", f"[Stats] 获取流量统计失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/network-stats', methods=['GET', 'OPTIONS'])
+def get_network_interface_stats(service_name):
+    """获取网络接口详细信息"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        add_log("INFO", f"[Network] 获取服务器 {service_name} 网络接口信息", "server_control")
+        
+        # 获取网络接口控制器信息
+        network_info = client.get(f'/dedicated/server/{service_name}/networkInterfaceController')
+        
+        interfaces = []
+        for mac in network_info:
+            interface_detail = client.get(
+                f'/dedicated/server/{service_name}/networkInterfaceController/{mac}'
+            )
+            interfaces.append(interface_detail)
+        
+        add_log("INFO", f"[Network] 找到 {len(interfaces)} 个网络接口", "server_control")
+        
+        return jsonify({
+            "success": True,
+            "interfaces": interfaces
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"[Network] 获取网络接口信息失败: {str(e)}", "server_control")
         return jsonify({"success": False, "error": str(e)}), 500
 
 # ==================== VPS 监控相关功能 ====================

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/utils/apiClient";
 import { useToast } from "../components/ToastContainer";
-import { Server, RefreshCw, Power, HardDrive, X, AlertCircle, Activity, Cpu, Wifi, Info, Calendar } from "lucide-react";
+import { Server, RefreshCw, Power, HardDrive, X, AlertCircle, Activity, Cpu, Wifi, Info, Calendar, Monitor } from "lucide-react";
 
 interface ServerInfo {
   serviceName: string;
@@ -42,6 +42,21 @@ interface PartitionScheme {
   }[];
 }
 
+interface ServiceInfo {
+  status: string;
+  creation: string;
+  expiration: string;
+  renewalType: boolean;
+}
+
+interface BootMode {
+  id: number;
+  bootType: string;
+  description: string;
+  kernel: string;
+  active: boolean;
+}
+
 const ServerControlPage: React.FC = () => {
   const { showToast, showConfirm } = useToast();
   const [servers, setServers] = useState<ServerInfo[]>([]);
@@ -76,8 +91,13 @@ const ServerControlPage: React.FC = () => {
   const [loadingIPs, setLoadingIPs] = useState(false);
   
   // Task 8: 服务信息
-  const [serviceInfo, setServiceInfo] = useState<any>(null);
+  const [serviceInfo, setServiceInfo] = useState<ServiceInfo | null>(null);
   const [loadingService, setLoadingService] = useState(false);
+  
+  // Task 10: 启动模式
+  const [showBootModeDialog, setShowBootModeDialog] = useState(false);
+  const [bootModes, setBootModes] = useState<BootMode[]>([]);
+  const [loadingBootModes, setLoadingBootModes] = useState(false);
 
   // Task 1: 获取服务器列表（只显示活跃服务器）
   const fetchServers = async () => {
@@ -351,6 +371,63 @@ const ServerControlPage: React.FC = () => {
     }
   };
 
+  // Task 10: 获取启动模式列表
+  const fetchBootModes = async () => {
+    if (!selectedServer) return;
+    setLoadingBootModes(true);
+    try {
+      const response = await api.get(`/server-control/${selectedServer.serviceName}/boot-mode`);
+      if (response.data.success) {
+        setBootModes(response.data.bootModes);
+        setShowBootModeDialog(true);
+      }
+    } catch (error: any) {
+      console.error('获取启动模式失败:', error);
+      showToast({ type: 'error', title: '获取启动模式失败' });
+    } finally {
+      setLoadingBootModes(false);
+    }
+  };
+
+  // Task 10: 切换启动模式
+  const changeBootMode = async (bootId: number) => {
+    if (!selectedServer) return;
+    
+    const confirmed = await showConfirm({
+      title: '确定切换启动模式？',
+      message: '切换后将自动重启服务器',
+      confirmText: '确认切换并重启',
+      cancelText: '取消'
+    });
+
+    if (!confirmed) return;
+
+    try {
+      // 1. 切换启动模式
+      const response = await api.put(`/server-control/${selectedServer.serviceName}/boot-mode`, {
+        bootId
+      });
+      
+      if (response.data.success) {
+        showToast({ type: 'success', title: '启动模式已切换' });
+        setShowBootModeDialog(false);
+        
+        // 2. 自动重启服务器
+        showToast({ type: 'info', title: '正在重启服务器...' });
+        const rebootResponse = await api.post(`/server-control/${selectedServer.serviceName}/reboot`);
+        
+        if (rebootResponse.data.success) {
+          showToast({ type: 'success', title: '服务器已重启，启动模式生效' });
+        } else {
+          showToast({ type: 'warning', title: '启动模式已切换，但重启失败，请手动重启' });
+        }
+      }
+    } catch (error: any) {
+      console.error('切换启动模式失败:', error);
+      showToast({ type: 'error', title: '切换启动模式失败' });
+    }
+  };
+
   useEffect(() => {
     fetchServers();
   }, []);
@@ -466,20 +543,32 @@ const ServerControlPage: React.FC = () => {
                 </div>
 
                 {/* 操作按钮 */}
-                <div className="flex gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <button
                     onClick={() => openTasksDialog(selectedServer)}
-                    className="px-4 py-2 bg-cyber-grid/50 border border-cyber-accent/30 rounded-lg text-cyber-text hover:bg-cyber-accent/10 transition-all flex items-center gap-2">
+                    className="px-4 py-2 bg-cyber-grid/50 border border-cyber-accent/30 rounded-lg text-cyber-text hover:bg-cyber-accent/10 transition-all flex items-center gap-2 justify-center">
                     <Activity className="w-4 h-4" />
                     查看任务
                   </button>
                   <button
                     onClick={() => handleReboot(selectedServer)}
-                    className="px-4 py-2 bg-cyber-grid/50 border border-cyber-accent/30 rounded-lg text-cyber-text hover:bg-cyber-accent/10 transition-all flex items-center gap-2">
+                    className="px-4 py-2 bg-cyber-grid/50 border border-cyber-accent/30 rounded-lg text-cyber-text hover:bg-cyber-accent/10 transition-all flex items-center gap-2 justify-center">
                     <Power className="w-4 h-4" />
                     重启服务器
                   </button>
-                  {/* 重装系统功能已移除 - OVH API不可用 */}
+                  <button
+                    onClick={() => openReinstallDialog(selectedServer)}
+                    className="px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 hover:bg-red-500/20 transition-all flex items-center gap-2 justify-center">
+                    <HardDrive className="w-4 h-4" />
+                    重装系统
+                  </button>
+                  <button
+                    onClick={fetchBootModes}
+                    disabled={loadingBootModes}
+                    className="px-4 py-2 bg-orange-500/10 border border-orange-500/30 rounded-lg text-orange-400 hover:bg-orange-500/20 transition-all flex items-center gap-2 justify-center disabled:opacity-50">
+                    <HardDrive className="w-4 h-4" />
+                    {loadingBootModes ? '加载中...' : '启动模式'}
+                  </button>
                 </div>
               </div>
 
@@ -881,6 +970,74 @@ const ServerControlPage: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Task 10: 启动模式对话框 */}
+      <AnimatePresence>
+        {showBootModeDialog && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="cyber-card max-w-2xl w-full">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <HardDrive className="w-5 h-5 text-orange-400" />
+                  <h3 className="text-xl font-semibold text-cyber-text">
+                    启动模式 - {selectedServer?.name}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowBootModeDialog(false)}
+                  className="text-cyber-muted hover:text-cyber-text transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-cyber-muted text-sm mb-4">
+                选择服务器的启动模式。切换后需要重启服务器才能生效。
+              </p>
+
+              <div className="space-y-3">
+                {bootModes.map((mode) => (
+                  <div
+                    key={mode.id}
+                    className={`p-4 border-2 rounded-lg transition-all cursor-pointer ${
+                      mode.active
+                        ? 'border-cyber-accent bg-cyber-accent/10'
+                        : 'border-cyber-accent/20 hover:border-cyber-accent/40 hover:bg-cyber-grid/30'
+                    }`}
+                    onClick={() => !mode.active && changeBootMode(mode.id)}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-lg font-semibold text-cyber-text">{mode.bootType}</h4>
+                          {mode.active && (
+                            <span className="px-2 py-1 bg-cyber-accent text-white text-xs rounded">当前</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-cyber-muted mt-1">{mode.description}</p>
+                        {mode.kernel && (
+                          <p className="text-xs text-cyber-muted/70 mt-1 font-mono">{mode.kernel}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end mt-6">
+                <button
+                  onClick={() => setShowBootModeDialog(false)}
+                  className="px-4 py-2 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 transition-all">
+                  关闭
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 };
