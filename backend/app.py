@@ -3437,18 +3437,51 @@ def get_hardware_info(service_name):
         return jsonify({
             "success": True,
             "hardware": {
-                'diskGroups': hardware.get('diskGroups', []),
-                'memorySize': hardware.get('memorySize', {}),
+                'bootMode': hardware.get('bootMode', 'N/A'),
+                'coresPerProcessor': hardware.get('coresPerProcessor', 0),
+                'threadsPerProcessor': hardware.get('threadsPerProcessor', 0),
+                'numberOfProcessors': hardware.get('numberOfProcessors', 0),
                 'processorName': hardware.get('processorName', 'N/A'),
                 'processorArchitecture': hardware.get('processorArchitecture', 'N/A'),
-                'processorCores': hardware.get('processorCores', 0),
-                'processorThreads': hardware.get('processorThreads', 0),
+                'memorySize': hardware.get('memorySize', {}),
+                'motherboard': hardware.get('motherboard', 'N/A'),
+                'formFactor': hardware.get('formFactor', 'N/A'),
+                'description': hardware.get('description', ''),
+                'diskGroups': hardware.get('diskGroups', []),
+                'expansionCards': hardware.get('expansionCards', []),
+                'usbKeys': hardware.get('usbKeys', []),
                 'defaultHardwareRaidSize': hardware.get('defaultHardwareRaidSize', {}),
                 'defaultHardwareRaidType': hardware.get('defaultHardwareRaidType', 'N/A')
             }
         })
     except Exception as e:
         add_log("ERROR", f"获取服务器 {service_name} 硬件信息失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/network-specs', methods=['GET'])
+def get_network_specs(service_name):
+    """获取网络规格详细信息"""
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        network = client.get(f'/dedicated/server/{service_name}/specifications/network')
+        return jsonify({
+            "success": True,
+            "network": {
+                'bandwidth': network.get('bandwidth', {}),
+                'connection': network.get('connection', {}),
+                'ola': network.get('ola', {}),
+                'routing': network.get('routing', {}),
+                'traffic': network.get('traffic', {}),
+                'switching': network.get('switching', {}),
+                'vmac': network.get('vmac', {}),
+                'vrack': network.get('vrack', {})
+            }
+        })
+    except Exception as e:
+        add_log("ERROR", f"获取服务器 {service_name} 网络规格失败: {str(e)}", "server_control")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/server-control/<service_name>/ips', methods=['GET'])
@@ -3659,14 +3692,56 @@ def get_ipmi_console(service_name):
                 "error": "服务器不支持KVM控制台访问"
             }), 400
         
-        # 请求KVM控制台访问
+        # 创建KVM控制台访问 - 使用POST方法，包含ttl参数
         add_log("INFO", f"[IPMI] 请求KVM控制台访问，类型: {access_type}", "server_control")
-        console_access = client.post(
+        
+        # 创建访问任务（返回taskId）
+        task = client.post(
             f'/dedicated/server/{service_name}/features/ipmi/access',
-            type=access_type
+            type=access_type,
+            ttl=15  # 15分钟有效期
         )
         
-        add_log("INFO", f"[IPMI] 控制台访问创建成功: {console_access}", "server_control")
+        task_id = task.get('taskId')
+        add_log("INFO", f"[IPMI] 创建访问任务: taskId={task_id}, status={task.get('status')}", "server_control")
+        
+        # 轮询任务状态直到完成
+        import time
+        max_retries = 10
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            time.sleep(2)  # 等待2秒
+            retry_count += 1
+            
+            # 检查任务状态
+            task_status = client.get(f'/dedicated/server/{service_name}/task/{task_id}')
+            status = task_status.get('status')
+            add_log("INFO", f"[IPMI] 任务状态检查 ({retry_count}/{max_retries}): {status}", "server_control")
+            
+            if status == 'done':
+                add_log("INFO", f"[IPMI] 任务完成！", "server_control")
+                break
+            elif status in ['cancelled', 'customerError', 'ovhError']:
+                add_log("ERROR", f"[IPMI] 任务失败: {status}", "server_control")
+                return jsonify({
+                    "success": False,
+                    "error": f"IPMI访问任务失败: {status}"
+                }), 500
+        
+        if retry_count >= max_retries:
+            add_log("ERROR", f"[IPMI] 任务超时", "server_control")
+            return jsonify({
+                "success": False,
+                "error": "IPMI访问任务超时"
+            }), 500
+        
+        # 获取访问URL
+        console_access = client.get(
+            f'/dedicated/server/{service_name}/features/ipmi/access?type={access_type}'
+        )
+        
+        add_log("INFO", f"[IPMI] 控制台访问信息: {console_access}", "server_control")
         
         return jsonify({
             "success": True,

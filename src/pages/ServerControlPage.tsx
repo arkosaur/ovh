@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/utils/apiClient";
 import { useToast } from "../components/ToastContainer";
-import { Server, RefreshCw, Power, HardDrive, X, AlertCircle, Activity, Cpu, Wifi, Info, Calendar, Monitor } from "lucide-react";
+import { Server, RefreshCw, Power, HardDrive, X, AlertCircle, Activity, Cpu, Wifi, Calendar, Monitor } from "lucide-react";
 
 interface ServerInfo {
   serviceName: string;
@@ -98,6 +98,12 @@ const ServerControlPage: React.FC = () => {
   const [showBootModeDialog, setShowBootModeDialog] = useState(false);
   const [bootModes, setBootModes] = useState<BootMode[]>([]);
   const [loadingBootModes, setLoadingBootModes] = useState(false);
+
+  // IPMI链接模态框
+  const [showIpmiLinkDialog, setShowIpmiLinkDialog] = useState(false);
+  const [ipmiLink, setIpmiLink] = useState<string>('');
+  const [ipmiLoading, setIpmiLoading] = useState(false);
+  const [ipmiCountdown, setIpmiCountdown] = useState(20);
 
   // Task 1: 获取服务器列表（只显示活跃服务器）
   const fetchServers = async () => {
@@ -371,6 +377,96 @@ const ServerControlPage: React.FC = () => {
     }
   };
 
+  // IPMI控制台
+  const openIPMIConsole = async () => {
+    if (!selectedServer) return;
+    try {
+      console.log('=== 开始获取IPMI ===');
+      console.log('服务器:', selectedServer.serviceName);
+      
+      // 启动倒计时
+      setIpmiLoading(true);
+      setIpmiCountdown(20);
+      
+      // 倒计时计时器
+      const countdownInterval = setInterval(() => {
+        setIpmiCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(countdownInterval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      const response = await api.get(`/server-control/${selectedServer.serviceName}/console`);
+      
+      // 清除倒计时
+      clearInterval(countdownInterval);
+      setIpmiLoading(false);
+      console.log('收到响应:', response);
+      console.log('响应数据:', response.data);
+      
+      if (response.data.success && response.data.console) {
+        console.log('✅ 响应成功');
+        const value = response.data.console.value;
+        const accessType = response.data.accessType;
+        
+        console.log('accessType:', accessType);
+        console.log('value length:', value?.length);
+        
+        if (!value) {
+          console.error('❌ value为空');
+          showToast({ type: 'error', title: '无法获取控制台访问' });
+          return;
+        }
+
+        // 判断访问类型
+        console.log('IPMI访问类型:', accessType);
+        console.log('IPMI访问值前100字符:', value.substring(0, 100));
+        
+        if (accessType === 'kvmipJnlp') {
+          // JNLP文件 - 下载并提示用户
+          const blob = new Blob([value], { type: 'application/x-java-jnlp-file' });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `ipmi-${selectedServer.serviceName}.jnlp`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+          
+          showToast({ 
+            type: 'success', 
+            title: 'JNLP文件已下载，请用Java打开'
+          });
+        } else if (accessType === 'kvmipHtml5URL' || accessType === 'serialOverLanURL') {
+          // HTML5或Serial URL - 显示链接模态框让用户点击
+          console.log('显示IPMI链接:', value);
+          setIpmiLink(value);
+          setShowIpmiLinkDialog(true);
+          showToast({ type: 'success', title: 'IPMI访问已就绪' });
+        } else {
+          console.error('❌ 未知的访问类型:', accessType);
+          setIpmiLoading(false);
+          showToast({ type: 'error', title: '不支持的访问类型: ' + accessType });
+        }
+      } else {
+        console.error('❌ 响应失败或无console数据');
+        console.log('success:', response.data.success);
+        console.log('console:', response.data.console);
+        setIpmiLoading(false);
+        showToast({ type: 'error', title: '无效的响应数据' });
+      }
+    } catch (error: any) {
+      console.error('❌ 打开IPMI控制台失败:', error);
+      console.error('错误详情:', error.response?.data);
+      setIpmiLoading(false);
+      showToast({ type: 'error', title: '打开IPMI控制台失败' });
+    }
+  };
+
   // Task 10: 获取启动模式列表
   const fetchBootModes = async () => {
     if (!selectedServer) return;
@@ -543,7 +639,7 @@ const ServerControlPage: React.FC = () => {
                 </div>
 
                 {/* 操作按钮 */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                   <button
                     onClick={() => openTasksDialog(selectedServer)}
                     className="px-4 py-2 bg-cyber-grid/50 border border-cyber-accent/30 rounded-lg text-cyber-text hover:bg-cyber-accent/10 transition-all flex items-center gap-2 justify-center">
@@ -555,6 +651,12 @@ const ServerControlPage: React.FC = () => {
                     className="px-4 py-2 bg-cyber-grid/50 border border-cyber-accent/30 rounded-lg text-cyber-text hover:bg-cyber-accent/10 transition-all flex items-center gap-2 justify-center">
                     <Power className="w-4 h-4" />
                     重启服务器
+                  </button>
+                  <button
+                    onClick={openIPMIConsole}
+                    className="px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-400 hover:bg-blue-500/20 transition-all flex items-center gap-2 justify-center">
+                    <Monitor className="w-4 h-4" />
+                    IPMI控制台
                   </button>
                   <button
                     onClick={() => openReinstallDialog(selectedServer)}
@@ -584,31 +686,74 @@ const ServerControlPage: React.FC = () => {
                     加载中...
                   </div>
                 ) : hardware ? (
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-cyber-muted">CPU:</span>
-                      <span className="text-cyber-text ml-2">{hardware.processorName}</span>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* 左列：基础信息 */}
+                    <div className="space-y-3">
+                      {/* 处理器 */}
+                      <div className="flex items-baseline">
+                        <span className="text-cyber-muted text-sm w-16">处理器:</span>
+                        <div className="flex-1">
+                          <span className="text-cyber-text font-semibold">{hardware.processorName}</span>
+                          {hardware.coresPerProcessor > 0 && hardware.threadsPerProcessor > 0 && (
+                            <span className="text-cyber-muted text-sm ml-2">
+                              ({hardware.coresPerProcessor}核/{hardware.threadsPerProcessor}线程)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 架构 */}
+                      <div className="flex items-baseline">
+                        <span className="text-cyber-muted text-sm w-16">架构:</span>
+                        <span className="text-cyber-text">{hardware.processorArchitecture}</span>
+                      </div>
+
+                      {/* 内存 */}
+                      <div className="flex items-baseline">
+                        <span className="text-cyber-muted text-sm w-16">内存:</span>
+                        <span className="text-cyber-text font-semibold">{hardware.memorySize?.value} {hardware.memorySize?.unit}</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-cyber-muted">核心/线程:</span>
-                      <span className="text-cyber-text ml-2">{hardware.processorCores}/{hardware.processorThreads}</span>
-                    </div>
-                    <div>
-                      <span className="text-cyber-muted">内存:</span>
-                      <span className="text-cyber-text ml-2">{hardware.memorySize?.value} {hardware.memorySize?.unit}</span>
-                    </div>
-                    <div>
-                      <span className="text-cyber-muted">RAID:</span>
-                      <span className="text-cyber-text ml-2">{hardware.defaultHardwareRaidType}</span>
-                    </div>
-                    <div>
-                      <span className="text-cyber-muted">架构:</span>
-                      <span className="text-cyber-text ml-2">{hardware.processorArchitecture}</span>
-                    </div>
-                    <div>
-                      <span className="text-cyber-muted">磁盘容量:</span>
-                      <span className="text-cyber-text ml-2">{hardware.defaultHardwareRaidSize?.value} {hardware.defaultHardwareRaidSize?.unit}</span>
-                    </div>
+
+                    {/* 右列：存储配置 */}
+                    {hardware.diskGroups && hardware.diskGroups.length > 0 && (
+                      <div>
+                        <div className="text-cyber-muted text-sm mb-3">存储配置</div>
+                        <div className="space-y-2">
+                          {hardware.diskGroups.map((group: any, idx: number) => (
+                            <div key={idx} className="pl-3 border-l-2 border-cyber-accent/30">
+                              <div className="text-sm text-cyber-text font-semibold">
+                                {group.numberOfDisks}x {group.diskSize?.value}{group.diskSize?.unit} {group.diskType}
+                                {group.defaultHardwareRaidType && group.defaultHardwareRaidType !== 'N/A' && (
+                                  <span className="text-cyber-muted font-normal ml-2">
+                                    (RAID {group.defaultHardwareRaidType.replace('raid', '')})
+                                  </span>
+                                )}
+                              </div>
+                              {group.description && (
+                                <div className="text-xs text-cyber-muted mt-1">
+                                  {group.description}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 扩展卡（如果有，横跨两列） */}
+                    {hardware.expansionCards && hardware.expansionCards.length > 0 && (
+                      <div className="lg:col-span-2">
+                        <div className="text-cyber-muted text-sm mb-2 border-t border-cyber-accent/10 pt-3">扩展设备</div>
+                        <div className="space-y-1 text-sm pl-3">
+                          {hardware.expansionCards.map((card: any, idx: number) => (
+                            <div key={idx} className="text-cyber-text">
+                              <span className="text-cyber-muted uppercase">{card.type}:</span> {card.description}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-cyber-muted text-sm">暂无硬件信息</p>
@@ -1032,6 +1177,105 @@ const ServerControlPage: React.FC = () => {
                   className="px-4 py-2 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 transition-all">
                   关闭
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* IPMI倒计时加载模态框 */}
+      <AnimatePresence>
+        {ipmiLoading && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-cyber-dark border border-cyber-accent rounded-lg p-8 max-w-md w-full text-center">
+              
+              <div className="flex justify-center mb-6">
+                <div className="relative">
+                  <div className="w-24 h-24 rounded-full border-4 border-cyber-accent/30"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-4xl font-bold text-cyber-accent">{ipmiCountdown}</span>
+                  </div>
+                  <svg className="absolute inset-0 w-24 h-24 -rotate-90">
+                    <circle
+                      cx="48"
+                      cy="48"
+                      r="44"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                      className="text-cyber-accent"
+                      strokeDasharray={`${(ipmiCountdown / 20) * 276.46} 276.46`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </div>
+              </div>
+
+              <h3 className="text-xl font-bold text-cyber-text mb-2">
+                正在生成IPMI访问
+              </h3>
+              <p className="text-cyber-muted text-sm mb-4">
+                请耐心等待，预计需要 20 秒
+              </p>
+              <div className="flex items-center justify-center gap-2 text-cyber-accent">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span className="text-sm">连接中...</span>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* IPMI链接模态框 */}
+      <AnimatePresence>
+        {showIpmiLinkDialog && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-cyber-dark border border-cyber-accent rounded-lg p-6 max-w-2xl w-full">
+              
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Monitor className="w-6 h-6 text-cyber-accent" />
+                  <h2 className="text-xl font-bold text-cyber-text">IPMI控制台</h2>
+                </div>
+                <button
+                  onClick={() => setShowIpmiLinkDialog(false)}
+                  className="p-2 hover:bg-cyber-grid/50 rounded-lg transition-all text-cyber-muted hover:text-cyber-text">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-cyber-muted mb-6">
+                IPMI控制台访问链接已生成，点击下方按钮打开控制台。
+              </p>
+
+              <div className="flex items-center gap-3 text-xs text-cyber-muted mb-6">
+                <AlertCircle className="w-4 h-4" />
+                <span>会话有效期: 15分钟 | 访问可能需要允许弹窗</span>
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowIpmiLinkDialog(false)}
+                  className="px-4 py-2 border border-cyber-accent/30 rounded-lg text-cyber-text hover:bg-cyber-grid/50 transition-all">
+                  关闭
+                </button>
+                <a
+                  href={ipmiLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setShowIpmiLinkDialog(false)}
+                  className="px-6 py-2 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 transition-all flex items-center gap-2">
+                  <Monitor className="w-4 h-4" />
+                  打开IPMI控制台
+                </a>
               </div>
             </motion.div>
           </div>
