@@ -385,7 +385,15 @@ def check_server_availability(plan_code, options=None):
     
     try:
         # 调用OVH API获取所有配置组合的可用性
+        # planCode 原样传递给 OVH API（包括 -v1 等后缀）
+        add_log("INFO", f"查询 {plan_code} 的可用性...")
         availabilities = client.get('/dedicated/server/datacenter/availabilities', planCode=plan_code)
+        
+        # 记录 OVH API 返回的数据
+        add_log("INFO", f"OVH API 返回 {len(availabilities) if availabilities else 0} 个配置组合")
+        if availabilities and len(availabilities) > 0:
+            fqn_list = [item.get('fqn', 'N/A') for item in availabilities[:3]]  # 只记录前3个
+            add_log("INFO", f"配置示例: {fqn_list}")
         
         # 如果没有返回数据
         if not availabilities or len(availabilities) == 0:
@@ -401,29 +409,18 @@ def check_server_availability(plan_code, options=None):
             storage_option = None
             
             for opt in options:
-                # 去掉选项中的后缀（如 ram-32g-ecc-2133-24sk20 -> ram-32g-ecc-2133）
-                # 匹配模式：保留到最后一个有意义的部分，去掉型号后缀
-                opt_clean = opt
-                # 如果包含型号后缀（如 -24sk20, -25sk 等），去掉它
-                if '-' in opt:
-                    parts = opt.rsplit('-', 1)  # 从右边分割一次
-                    # 检查最后一部分是否像型号代码（包含数字和字母的组合）
-                    last_part = parts[1]
-                    # 如果最后部分看起来像型号代码（如24sk20, 25sk等），去掉它
-                    if last_part and (last_part[0].isdigit() or len(last_part) <= 6):
-                        # 进一步检查：如果去掉后缀后还有内容
-                        if parts[0] and ('-' in parts[0] or len(parts[0]) > 3):
-                            opt_clean = parts[0]
+                opt_lower = opt.lower()
                 
-                opt_lower = opt_clean.lower()
                 # 匹配内存配置
                 if 'ram-' in opt_lower or 'memory' in opt_lower:
-                    memory_option = opt_clean
+                    memory_option = opt
+                    add_log("INFO", f"识别内存配置: {opt}")
                 # 匹配存储配置
-                elif 'softraid-' in opt_lower or 'disk' in opt_lower or 'nvme' in opt_lower or 'sa' in opt_lower:
-                    storage_option = opt_clean
+                elif 'softraid-' in opt_lower or 'hybrid' in opt_lower or 'disk' in opt_lower or 'nvme' in opt_lower or 'raid' in opt_lower:
+                    storage_option = opt
+                    add_log("INFO", f"识别存储配置: {opt}")
             
-            add_log("INFO", f"提取并清理配置 - 内存: {memory_option}, 存储: {storage_option}")
+            add_log("INFO", f"提取配置 - 内存: {memory_option}, 存储: {storage_option}")
             
             # 遍历所有配置组合，找到匹配的
             matched_config = None
@@ -432,14 +429,62 @@ def check_server_availability(plan_code, options=None):
                 item_storage = item.get("storage")
                 item_fqn = item.get("fqn")
                 
-                # 匹配逻辑
-                memory_match = (not memory_option) or (item_memory == memory_option)
-                storage_match = (not storage_option) or (item_storage == storage_option)
+                add_log("INFO", f"检查配置: {item_fqn}")
+                add_log("INFO", f"  OVH内存: {item_memory}, OVH存储: {item_storage}")
+                
+                # 匹配逻辑：需要处理型号后缀
+                # 前端传递：ram-16g-24skstor01
+                # OVH返回：ram-16g
+                # 匹配：前端值.startswith(OVH值)
+                
+                memory_match = True
+                if memory_option:
+                    if item_memory:
+                        # 提取关键部分进行匹配
+                        # 前端：ram-16g-24skstor01 -> ram-16g
+                        # OVH：ram-16g-ecc-2133 -> ram-16g
+                        # 策略：提取前两段（如 ram-16g）进行比较
+                        
+                        user_memory_parts = memory_option.split('-')[:2]  # ['ram', '16g']
+                        ovh_memory_parts = item_memory.split('-')[:2]     # ['ram', '16g']
+                        
+                        user_memory_key = '-'.join(user_memory_parts)  # 'ram-16g'
+                        ovh_memory_key = '-'.join(ovh_memory_parts)    # 'ram-16g'
+                        
+                        memory_match = (user_memory_key == ovh_memory_key)
+                        add_log("INFO", f"  内存匹配: '{memory_option}' ({user_memory_key}) vs '{item_memory}' ({ovh_memory_key}) = {memory_match}")
+                    else:
+                        memory_match = False
+                        add_log("INFO", f"  内存匹配: OVH无内存字段 = False")
+                else:
+                    # 用户没有选择内存配置，允许任何内存
+                    memory_match = True
+                    add_log("INFO", f"  内存匹配: 用户未选内存，允许匹配 = True")
+                
+                storage_match = True
+                if storage_option:
+                    if item_storage:
+                        # 对于存储，直接使用前缀匹配（因为存储格式比较一致）
+                        # 前端：hybridsoftraid-4x4000sa-1x500nvme-24skstor
+                        # OVH：hybridsoftraid-4x4000sa-1x500nvme
+                        storage_match = storage_option.startswith(item_storage)
+                        add_log("INFO", f"  存储匹配: '{storage_option}'.startswith('{item_storage}') = {storage_match}")
+                    else:
+                        storage_match = False
+                        add_log("INFO", f"  存储匹配: OVH无存储字段 = False")
+                else:
+                    # 用户没有选择存储配置，允许任何存储
+                    storage_match = True
+                    add_log("INFO", f"  存储匹配: 用户未选存储，允许匹配 = True")
+                
+                add_log("INFO", f"  最终匹配结果: memory={memory_match}, storage={storage_match}")
                 
                 if memory_match and storage_match:
                     matched_config = item
                     add_log("INFO", f"✅ 找到匹配配置: {item_fqn}")
                     break
+                else:
+                    add_log("INFO", f"❌ 不匹配，继续下一个")
             
             # 如果找到匹配的配置
             if matched_config:
