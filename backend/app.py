@@ -401,15 +401,29 @@ def check_server_availability(plan_code, options=None):
             storage_option = None
             
             for opt in options:
-                opt_lower = opt.lower()
+                # 去掉选项中的后缀（如 ram-32g-ecc-2133-24sk20 -> ram-32g-ecc-2133）
+                # 匹配模式：保留到最后一个有意义的部分，去掉型号后缀
+                opt_clean = opt
+                # 如果包含型号后缀（如 -24sk20, -25sk 等），去掉它
+                if '-' in opt:
+                    parts = opt.rsplit('-', 1)  # 从右边分割一次
+                    # 检查最后一部分是否像型号代码（包含数字和字母的组合）
+                    last_part = parts[1]
+                    # 如果最后部分看起来像型号代码（如24sk20, 25sk等），去掉它
+                    if last_part and (last_part[0].isdigit() or len(last_part) <= 6):
+                        # 进一步检查：如果去掉后缀后还有内容
+                        if parts[0] and ('-' in parts[0] or len(parts[0]) > 3):
+                            opt_clean = parts[0]
+                
+                opt_lower = opt_clean.lower()
                 # 匹配内存配置
                 if 'ram-' in opt_lower or 'memory' in opt_lower:
-                    memory_option = opt
+                    memory_option = opt_clean
                 # 匹配存储配置
                 elif 'softraid-' in opt_lower or 'disk' in opt_lower or 'nvme' in opt_lower or 'sa' in opt_lower:
-                    storage_option = opt
+                    storage_option = opt_clean
             
-            add_log("INFO", f"提取配置 - 内存: {memory_option}, 存储: {storage_option}")
+            add_log("INFO", f"提取并清理配置 - 内存: {memory_option}, 存储: {storage_option}")
             
             # 遍历所有配置组合，找到匹配的
             matched_config = None
