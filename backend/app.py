@@ -3922,13 +3922,27 @@ def get_ipmi_console(service_name):
             client_ip = client_ip.split(',')[0].strip()
         
         add_log("INFO", f"[IPMI] 客户端IP: {client_ip}", "server_control")
+        add_log("INFO", f"[IPMI] X-Forwarded-For: {request.headers.get('X-Forwarded-For')}", "server_control")
+        add_log("INFO", f"[IPMI] remote_addr: {request.remote_addr}", "server_control")
         
-        # 创建访问任务（返回taskId），添加IP白名单
+        # 创建访问任务（返回taskId）
+        # ttl有效值: 15, 60, 120, 240, 480, 1440 (分钟)
+        # 只有公网IP才添加白名单，避免传入127.0.0.1导致403
+        task_params = {
+            'type': access_type,
+            'ttl': 15  # 15分钟有效期
+        }
+        
+        # 检查是否为有效的公网IP
+        if client_ip and not client_ip.startswith('127.') and not client_ip.startswith('192.168.') and not client_ip.startswith('10.'):
+            task_params['ipToAllow'] = client_ip
+            add_log("INFO", f"[IPMI] 添加IP白名单: {client_ip}", "server_control")
+        else:
+            add_log("WARNING", f"[IPMI] 跳过IP白名单（本地或内网IP）: {client_ip}", "server_control")
+        
         task = client.post(
             f'/dedicated/server/{service_name}/features/ipmi/access',
-            type=access_type,
-            ttl=60,  # 增加到60分钟有效期
-            ipToAllow=client_ip  # 添加客户端IP到白名单
+            **task_params
         )
         
         task_id = task.get('taskId')
