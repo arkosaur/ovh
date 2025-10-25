@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/utils/apiClient";
 import { useToast } from "../components/ToastContainer";
-import { Server, RefreshCw, Power, HardDrive, X, AlertCircle, Activity, Cpu, Wifi, Calendar, Monitor } from "lucide-react";
+import { Server, RefreshCw, Power, HardDrive, X, AlertCircle, Activity, Cpu, Wifi, Calendar, Monitor, Mail } from "lucide-react";
 
 interface ServerInfo {
   serviceName: string;
@@ -125,8 +125,11 @@ const ServerControlPage: React.FC = () => {
   // 安装进度监控
   const [showInstallProgress, setShowInstallProgress] = useState(false);
   const [installProgress, setInstallProgress] = useState<InstallProgress | null>(null);
+  const [installCompleted, setInstallCompleted] = useState(false); // 标记安装是否已完成
+  const [autoCloseCountdown, setAutoCloseCountdown] = useState(5); // 自动关闭倒计时
   const [installPollingInterval, setInstallPollingInterval] = useState<NodeJS.Timeout | null>(null);
   const installProgressRef = useRef<InstallProgress | null>(null); // 用于在定时器回调中访问最新状态
+  const completionToastShownRef = useRef<boolean>(false); // 防止重复显示完成提示
 
   // Task 1: 获取服务器列表（只显示活跃服务器）
   const fetchServers = async () => {
@@ -364,13 +367,38 @@ const ServerControlPage: React.FC = () => {
           const latestProgress = installProgressRef.current;
           console.log('[fetchInstallProgress] 最新进度状态:', latestProgress);
           
-          if (latestProgress && latestProgress.progressPercentage > 0) {
-            console.log('[fetchInstallProgress] 显示安装完成提示');
+          // 检查是否已经显示过Toast（防止重复显示）
+          if (!completionToastShownRef.current && latestProgress && latestProgress.progressPercentage > 0) {
+            console.log('[fetchInstallProgress] 显示安装完成提示（仅一次）');
+            completionToastShownRef.current = true; // 标记已显示
+            installProgressRef.current = null; // 立即清空ref，防止其他请求重复触发
+            
             showToast({ 
               type: 'success', 
               title: '✅ 系统安装完成！',
               message: '服务器已成功安装系统'
             });
+            
+            // 设置完成状态，显示完成页面
+            setInstallCompleted(true);
+            setAutoCloseCountdown(5); // 重置倒计时
+            
+            // 启动倒计时（每秒减1）
+            let countdown = 5;
+            const countdownInterval = setInterval(() => {
+              countdown--;
+              setAutoCloseCountdown(countdown);
+              
+              if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                console.log('[fetchInstallProgress] 倒计时结束，自动关闭进度模态框');
+                setShowInstallProgress(false);
+                setInstallProgress(null);
+                setInstallCompleted(false);
+              }
+            }, 1000);
+          } else if (completionToastShownRef.current) {
+            console.log('[fetchInstallProgress] Toast已显示过，跳过');
           } else {
             console.log('[fetchInstallProgress] 没有之前的进度数据，不显示提示');
           }
@@ -447,6 +475,11 @@ const ServerControlPage: React.FC = () => {
     // 显示进度模态框
     setShowInstallProgress(true);
     
+    // 重置完成提示标志（开始新的安装）
+    completionToastShownRef.current = false;
+    setInstallCompleted(false);
+    setAutoCloseCountdown(5);
+    
     // 如果没有现有进度数据，清空（避免闪烁）
     // 如果有现有数据，保留它（用于恢复进度显示）
     if (!installProgress) {
@@ -482,7 +515,10 @@ const ServerControlPage: React.FC = () => {
     stopInstallProgressMonitoring();
     setShowInstallProgress(false);
     setInstallProgress(null);
+    setInstallCompleted(false);
+    setAutoCloseCountdown(5);
     installProgressRef.current = null; // 清空ref
+    completionToastShownRef.current = false; // 重置标志
   };
 
   // 清理：组件卸载时停止轮询
@@ -1516,7 +1552,73 @@ const ServerControlPage: React.FC = () => {
                 </button>
               </div>
 
-              {!installProgress ? (
+              {installCompleted ? (
+                // 安装完成页面
+                <div className="flex flex-col items-center justify-center py-12 px-6">
+                  {/* 成功图标 */}
+                  <div className="mb-6 relative">
+                    <div className="w-24 h-24 rounded-full bg-green-500/20 border-4 border-green-500 flex items-center justify-center">
+                      <svg className="w-12 h-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* 标题 */}
+                  <h3 className="text-2xl font-bold text-cyber-text mb-3">
+                    ✅ 系统安装完成！
+                  </h3>
+
+                  {/* 邮件提示 */}
+                  <div className="w-full max-w-md mb-6">
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-6">
+                      <div className="flex items-start gap-3 mb-4">
+                        <Mail className="w-6 h-6 text-blue-400 flex-shrink-0 mt-1" />
+                        <div>
+                          <h4 className="text-lg font-semibold text-blue-400 mb-2">
+                            📧 请查收OVH邮件
+                          </h4>
+                          <p className="text-cyber-muted text-sm mb-3">
+                            OVH已向您的注册邮箱发送安装完成通知，邮件包含：
+                          </p>
+                          <ul className="space-y-2 text-sm text-cyber-text">
+                            <li className="flex items-start gap-2">
+                              <span className="text-cyber-accent">•</span>
+                              <span><strong className="text-cyber-accent">Root登录密码</strong> - 首次登录凭证</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="text-cyber-accent">•</span>
+                              <span><strong className="text-cyber-accent">服务器IP地址</strong> - SSH远程连接地址</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="text-cyber-accent">•</span>
+                              <span><strong className="text-cyber-accent">安装详细日志</strong> - 完整的系统配置信息</span>
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-cyber-muted bg-cyber-dark/50 rounded p-3">
+                        <AlertCircle className="w-4 h-4" />
+                        <span>如未收到邮件，请检查垃圾邮件箱或联系OVH客服</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 倒计时提示 */}
+                  <div className="text-center mb-4">
+                    <p className="text-sm text-cyber-muted">
+                      窗口将在 <span className="text-cyber-accent font-bold text-lg">{autoCloseCountdown}</span> 秒后自动关闭
+                    </p>
+                  </div>
+
+                  {/* 关闭按钮 */}
+                  <button
+                    onClick={closeInstallProgress}
+                    className="px-8 py-3 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 transition-all font-semibold">
+                    立即关闭
+                  </button>
+                </div>
+              ) : !installProgress ? (
                 // 加载中
                 <div className="flex flex-col items-center justify-center py-12">
                   <RefreshCw className="w-12 h-12 text-cyber-accent animate-spin mb-4" />
