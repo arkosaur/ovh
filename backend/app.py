@@ -3308,6 +3308,227 @@ def install_os(service_name):
         add_log("ERROR", f"重装服务器 {service_name} 系统失败: {str(e)}", "server_control")
         return jsonify({"success": False, "error": str(e)}), 500
 
+# 安装步骤中文翻译
+def translate_install_step(comment):
+    """将OVH API返回的英文步骤翻译成中文"""
+    translations = {
+        # OVH官方安装步骤（完整21步）
+        'Pre-configuring Post-installation': '预配置安装后脚本',
+        'Downloading OS image': '下载系统镜像',
+        'Deploying OS on disks': '部署系统到磁盘',
+        'Configuring Boot': '配置启动项',
+        'Checking Partitioning': '检查分区',
+        'Switching boot': '切换启动模式',
+        'Running Last Reboot': '执行最后重启',
+        'Waiting for services to be up': '等待服务启动',
+        'Publishing Admin password on API': '发布管理员密码到API',
+        
+        # BIOS和硬件相关
+        'Checking BIOS version': '检查BIOS版本',
+        'Running Hardware Reboot': '执行硬件重启',
+        'Setting up hardware raid': '配置硬件RAID',
+        'Preparing disks for new Partitioning': '准备磁盘分区',
+        'Checking hardware': '检查硬件',
+        'Initializing hardware': '初始化硬件',
+        
+        # 安装过程步骤
+        'Preparing installation': '准备安装',
+        'Partitioning disk': '分区磁盘',
+        'Partitioning disks': '分区磁盘',
+        'Cleaning Partitioning': '清理分区',
+        'Processing Partitioning': '处理分区',
+        'Applying Partitioning': '应用分区配置',
+        'Formatting partitions': '格式化分区',
+        'Installing system': '安装系统',
+        'Installing system files': '安装系统文件',
+        'Installing packages': '安装软件包',
+        'Installing bootloader': '安装引导程序',
+        'Installing grub': '安装GRUB引导',
+        'Configuring system': '配置系统',
+        'Configuring network': '配置网络',
+        'Setting up network': '设置网络',
+        'Setting up system': '设置系统',
+        'Applying configuration': '应用配置',
+        'Processing Post-installation configuration': '处理安装后配置',
+        'Finalizing installation': '完成安装',
+        
+        # 重启相关
+        'Rebooting': '重启中',
+        'Rebooting server': '重启服务器',
+        'Reboot': '重启',
+        'First boot': '首次启动',
+        'Booting': '启动中',
+        
+        # 服务相关
+        'Starting services': '启动服务',
+        'Starting system services': '启动系统服务',
+        'Enabling services': '启用服务',
+        
+        # 完成状态
+        'Installation completed': '安装完成',
+        'Installation finished': '安装完成',
+        'Done': '完成',
+        'Completed': '已完成',
+        
+        # 磁盘和分区
+        'Wiping disks': '擦除磁盘',
+        'Cleaning disks': '清理磁盘',
+        'Creating partitions': '创建分区',
+        'Creating filesystems': '创建文件系统',
+        'Mounting filesystems': '挂载文件系统',
+        
+        # 下载相关
+        'Fetching image': '获取镜像',
+        'Extracting image': '解压镜像',
+        'Copying files': '复制文件',
+        
+        # 配置相关
+        'Generating configuration': '生成配置',
+        'Writing configuration': '写入配置',
+        'Setting hostname': '设置主机名',
+        'Configuring timezone': '配置时区',
+        'Configuring locale': '配置语言',
+        
+        # 密钥和密码
+        'Generating SSH keys': '生成SSH密钥',
+        'Setting root password': '设置root密码',
+        'Managing Admin password': '管理管理员密码',
+        'Publishing password': '发布密码',
+        
+        # 邮件和通知
+        'Sending end of installation mail': '发送安装完成邮件',
+        'Sending notification': '发送通知',
+        'Notifying completion': '通知完成',
+        
+        # 常见错误信息
+        'Failed': '失败',
+        'Failed to download': '下载失败',
+        'Failed to install': '安装失败',
+        'Error': '错误',
+        'Partition error': '分区错误',
+        'Boot configuration failed': '启动配置失败',
+        'Network configuration failed': '网络配置失败',
+        'Timeout': '超时',
+    }
+    
+    # 如果为空，直接返回
+    if not comment or comment.strip() == '':
+        return comment
+    
+    # 尝试完全匹配（忽略大小写）
+    for key, value in translations.items():
+        if comment.lower() == key.lower():
+            return value
+    
+    # 尝试部分匹配（包含关键词）
+    comment_lower = comment.lower()
+    for eng, chn in translations.items():
+        if eng.lower() in comment_lower:
+            return chn
+    
+    # 如果没有匹配，记录日志并返回原文
+    add_log("WARNING", f"[翻译] 未找到翻译: '{comment}'", "server_control")
+    return comment
+
+@app.route('/api/server-control/<service_name>/install/status', methods=['GET', 'OPTIONS'])
+def get_install_status(service_name):
+    """获取系统安装进度"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+    
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        # 获取安装进度
+        status = client.get(f'/dedicated/server/{service_name}/install/status')
+        
+        elapsed_time = status.get('elapsedTime', 0)
+        progress_steps = status.get('progress', [])
+        
+        # 计算总体进度百分比
+        total_steps = len(progress_steps)
+        completed_steps = sum(1 for step in progress_steps if step.get('status') == 'done')
+        progress_percentage = int((completed_steps / total_steps * 100)) if total_steps > 0 else 0
+        
+        # 检查是否有错误
+        has_error = any(step.get('status') == 'error' for step in progress_steps)
+        
+        # 检查是否全部完成
+        all_done = total_steps > 0 and completed_steps == total_steps
+        
+        # 格式化步骤信息（翻译成中文）
+        formatted_steps = []
+        for step in progress_steps:
+            original_comment = step.get('comment', '')
+            translated_comment = translate_install_step(original_comment)
+            
+            formatted_steps.append({
+                'comment': translated_comment,
+                'commentOriginal': original_comment,  # 保留原文以便调试
+                'status': step.get('status', 'unknown'),
+                'error': step.get('error', '')
+            })
+        
+        add_log("INFO", f"获取服务器 {service_name} 安装进度: {progress_percentage}%", "server_control")
+        
+        return jsonify({
+            "success": True,
+            "status": {
+                'elapsedTime': elapsed_time,
+                'progressPercentage': progress_percentage,
+                'totalSteps': total_steps,
+                'completedSteps': completed_steps,
+                'hasError': has_error,
+                'allDone': all_done,
+                'steps': formatted_steps
+            }
+        })
+        
+    except Exception as e:
+        error_message = str(e)
+        error_type = type(e).__name__
+        
+        # 详细记录错误信息用于调试
+        add_log("DEBUG", f"[Install Status] 异常类型: {error_type}, 错误信息: {error_message}", "server_control")
+        
+        # 检查是否是"没有安装进度"的错误
+        # OVH API在没有进行中的安装时可能返回多种错误
+        error_lower = error_message.lower()
+        
+        # 常见的"无安装进度"错误特征
+        no_install_indicators = [
+            '404',
+            'not found',
+            'no installation',
+            'no task',
+            'does not exist',
+            'resource not found',
+            'this service is not', 
+            'no os installation',
+            'not installing',
+            'installation not found',
+            'not being installed',      # OVH: Server is not being installed
+            'not being reinstalled',    # OVH: Server is not being reinstalled
+            'being installed or reinstalled at the moment'  # 完整匹配
+        ]
+        
+        is_no_install = any(indicator in error_lower for indicator in no_install_indicators)
+        
+        if is_no_install:
+            add_log("INFO", f"服务器 {service_name} 当前没有正在进行的安装 (原因: {error_message[:100]})", "server_control")
+            # 返回404，让前端知道没有安装进度
+            return jsonify({
+                "success": False, 
+                "error": "No installation in progress",
+                "message": "当前没有正在进行的安装"
+            }), 404
+        
+        # 其他错误返回500
+        add_log("ERROR", f"获取服务器 {service_name} 安装进度失败: [{error_type}] {error_message}", "server_control")
+        return jsonify({"success": False, "error": error_message, "type": error_type}), 500
+
 @app.route('/api/server-control/<service_name>/tasks', methods=['GET'])
 def get_server_tasks(service_name):
     """获取服务器任务列表"""

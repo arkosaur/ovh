@@ -57,6 +57,23 @@ interface BootMode {
   active: boolean;
 }
 
+interface InstallStep {
+  comment: string;
+  commentOriginal?: string;  // 原文（用于调试）
+  status: 'doing' | 'done' | 'error' | 'todo' | 'init';
+  error: string;
+}
+
+interface InstallProgress {
+  elapsedTime: number;
+  progressPercentage: number;
+  totalSteps: number;
+  completedSteps: number;
+  hasError: boolean;
+  allDone: boolean;
+  steps: InstallStep[];
+}
+
 const ServerControlPage: React.FC = () => {
   const { showToast, showConfirm } = useToast();
   const [servers, setServers] = useState<ServerInfo[]>([]);
@@ -104,6 +121,11 @@ const ServerControlPage: React.FC = () => {
   const [ipmiLink, setIpmiLink] = useState<string>('');
   const [ipmiLoading, setIpmiLoading] = useState(false);
   const [ipmiCountdown, setIpmiCountdown] = useState(20);
+
+  // 安装进度监控
+  const [showInstallProgress, setShowInstallProgress] = useState(false);
+  const [installProgress, setInstallProgress] = useState<InstallProgress | null>(null);
+  const [installPollingInterval, setInstallPollingInterval] = useState<NodeJS.Timeout | null>(null);
 
   // Task 1: 获取服务器列表（只显示活跃服务器）
   const fetchServers = async () => {
@@ -222,9 +244,44 @@ const ServerControlPage: React.FC = () => {
     }
   };
 
-  // Task 3: 打开重装对话框
+  // Task 3: 打开重装对话框（先检查是否有正在进行的安装）
   const openReinstallDialog = async (server: ServerInfo) => {
     setSelectedServer(server);
+    
+    // 先检查是否有正在进行的安装（404视为正常，不抛出错误）
+    try {
+      const response = await api.get(`/server-control/${server.serviceName}/install/status`, {
+        validateStatus: (status) => status === 200 || status === 404  // 200和404都视为成功
+      });
+      
+      // 如果是404，说明没有安装进度，继续打开重装对话框
+      if (response.status === 404) {
+        // 静默处理，继续执行下面的代码
+      } else if (response.data.success) {
+        const progress = response.data.status;
+        
+        // 如果有正在进行的安装（未完成且无错误）
+        if (!progress.allDone && !progress.hasError && progress.totalSteps > 0) {
+          // 设置初始进度数据
+          setInstallProgress(progress);
+          
+          // 启动轮询（会自动显示进度窗口）
+          startInstallProgressMonitoring();
+          
+          showToast({ 
+            type: 'info', 
+            title: `检测到正在进行的安装 (${progress.progressPercentage}%)` 
+          });
+          
+          return; // 不打开重装对话框
+        }
+      }
+    } catch (error: any) {
+      // 真实错误（如网络错误），静默处理
+      console.log('检查安装进度时出错，继续打开重装对话框');
+    }
+    
+    // 没有正在进行的安装，正常打开重装对话框
     setSelectedTemplate("");
     setCustomHostname("");
     setPartitionSchemes([]);
@@ -271,6 +328,9 @@ const ServerControlPage: React.FC = () => {
       if (response.data.success) {
         showToast({ type: 'success', title: '系统重装请求已发送' });
         setShowReinstallDialog(false);
+        
+        // 启动安装进度监控
+        startInstallProgressMonitoring();
       }
     } catch (error: any) {
       console.error('重装失败:', error);
@@ -279,6 +339,105 @@ const ServerControlPage: React.FC = () => {
       setIsProcessing(false);
     }
   };
+
+  // 安装进度：获取安装进度
+  const fetchInstallProgress = async () => {
+    if (!selectedServer) return;
+    
+    try {
+      const response = await api.get(`/server-control/${selectedServer.serviceName}/install/status`);
+      
+      if (response.data.success) {
+        const progress = response.data.status;
+        setInstallProgress(progress);
+        
+        // 如果安装完成或出错，停止轮询
+        if (progress.allDone || progress.hasError) {
+          stopInstallProgressMonitoring();
+          
+          if (progress.allDone) {
+            showToast({ type: 'success', title: '系统安装完成！' });
+          } else if (progress.hasError) {
+            showToast({ type: 'error', title: '系统安装出错' });
+          }
+        }
+      }
+    } catch (error: any) {
+      // 如果API返回404，说明没有安装任务
+      if (error.response?.status === 404) {
+        stopInstallProgressMonitoring();
+        
+        // 判断：如果之前有进度数据，说明安装刚完成
+        if (installProgress && installProgress.progressPercentage > 0) {
+          showToast({ 
+            type: 'success', 
+            title: '✅ 系统安装完成！',
+            message: '服务器已成功安装系统'
+          });
+        }
+        // 如果之前没有进度数据，说明本来就没有安装（正常情况）
+        
+        return; // 404是正常情况，不显示错误日志
+      }
+      
+      // 如果是500错误，也停止轮询
+      if (error.response?.status === 500) {
+        stopInstallProgressMonitoring();
+      }
+      
+      // 只有非404/500错误才记录日志
+      console.error('获取安装进度失败:', error);
+    }
+  };
+
+  // 安装进度：启动轮询
+  const startInstallProgressMonitoring = () => {
+    // 先清除之前的轮询
+    if (installPollingInterval) {
+      clearInterval(installPollingInterval);
+    }
+    
+    // 显示进度模态框
+    setShowInstallProgress(true);
+    
+    // 如果没有现有进度数据，清空（避免闪烁）
+    // 如果有现有数据，保留它（用于恢复进度显示）
+    if (!installProgress) {
+      setInstallProgress(null);
+    }
+    
+    // 立即获取一次进度
+    fetchInstallProgress();
+    
+    // 每5秒轮询一次
+    const interval = setInterval(() => {
+      fetchInstallProgress();
+    }, 5000);
+    
+    setInstallPollingInterval(interval);
+  };
+
+  // 安装进度：停止轮询
+  const stopInstallProgressMonitoring = () => {
+    if (installPollingInterval) {
+      clearInterval(installPollingInterval);
+      setInstallPollingInterval(null);
+    }
+  };
+
+  // 安装进度：手动关闭进度模态框
+  const closeInstallProgress = () => {
+    stopInstallProgressMonitoring();
+    setShowInstallProgress(false);
+    setInstallProgress(null);
+  };
+
+  // 清理：组件卸载时停止轮询
+  useEffect(() => {
+    return () => {
+      stopInstallProgressMonitoring();
+    };
+  }, [installPollingInterval]);
 
   // Task 4: 获取服务器任务
   const fetchServerTasks = async (serviceName: string) => {
@@ -1277,6 +1436,161 @@ const ServerControlPage: React.FC = () => {
                   打开IPMI控制台
                 </a>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 安装进度模态框 */}
+      <AnimatePresence>
+        {showInstallProgress && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-cyber-dark border border-cyber-accent rounded-lg p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto">
+              
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <HardDrive className="w-6 h-6 text-cyber-accent" />
+                  <h2 className="text-2xl font-bold text-cyber-text">系统安装进度</h2>
+                </div>
+                <button
+                  onClick={closeInstallProgress}
+                  className="p-2 hover:bg-cyber-grid/50 rounded-lg transition-all text-cyber-muted hover:text-cyber-text">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {!installProgress ? (
+                // 加载中
+                <div className="flex flex-col items-center justify-center py-12">
+                  <RefreshCw className="w-12 h-12 text-cyber-accent animate-spin mb-4" />
+                  <p className="text-cyber-muted">正在获取安装进度...</p>
+                </div>
+              ) : (
+                <>
+                  {/* 进度条 */}
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-cyber-text font-semibold">总体进度</span>
+                      <span className="text-cyber-accent font-bold text-xl">{installProgress.progressPercentage}%</span>
+                    </div>
+                    <div className="w-full h-4 bg-cyber-grid/30 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-gradient-to-r from-cyber-accent to-blue-500 rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${installProgress.progressPercentage}%` }}
+                        transition={{ duration: 0.5 }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between mt-2 text-sm text-cyber-muted">
+                      <span>{installProgress.completedSteps} / {installProgress.totalSteps} 步骤完成</span>
+                      <span>已用时间: {Math.floor(installProgress.elapsedTime / 60)}分{installProgress.elapsedTime % 60}秒</span>
+                    </div>
+                  </div>
+
+                  {/* 状态提示 */}
+                  {installProgress.allDone && (
+                    <div className="mb-4 p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex items-center gap-3">
+                      <Activity className="w-5 h-5 text-green-500" />
+                      <span className="text-green-500 font-semibold">✅ 系统安装已完成！</span>
+                    </div>
+                  )}
+
+                  {installProgress.hasError && (
+                    <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-3">
+                      <AlertCircle className="w-5 h-5 text-red-500" />
+                      <span className="text-red-500 font-semibold">❌ 安装过程中出现错误</span>
+                    </div>
+                  )}
+
+                  {/* 安装步骤列表 */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-cyber-text mb-3">安装步骤</h3>
+                    <div className="space-y-2">
+                      {installProgress.steps.map((step, index) => (
+                        <div
+                          key={index}
+                          className={`p-3 rounded-lg border ${
+                            step.status === 'done'
+                              ? 'bg-green-500/10 border-green-500/30'
+                              : step.status === 'doing'
+                              ? 'bg-blue-500/10 border-blue-500/30'
+                              : step.status === 'error'
+                              ? 'bg-red-500/10 border-red-500/30'
+                              : 'bg-cyber-grid/20 border-cyber-accent/20'
+                          }`}>
+                          <div className="flex items-center gap-3">
+                            {step.status === 'done' && (
+                              <span className="text-green-500 text-lg">✓</span>
+                            )}
+                            {step.status === 'doing' && (
+                              <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
+                            )}
+                            {step.status === 'error' && (
+                              <AlertCircle className="w-4 h-4 text-red-500" />
+                            )}
+                            {(step.status === 'todo' || step.status === 'init') && (
+                              <span className="w-4 h-4 rounded-full border-2 border-cyber-muted"></span>
+                            )}
+                            
+                            <div className="flex-1">
+                              <p className={`font-medium ${
+                                step.status === 'done'
+                                  ? 'text-green-400'
+                                  : step.status === 'doing'
+                                  ? 'text-blue-400'
+                                  : step.status === 'error'
+                                  ? 'text-red-400'
+                                  : 'text-cyber-muted'
+                              }`}>
+                                {step.comment || `步骤 ${index + 1}`}
+                              </p>
+                              {step.error && (
+                                <p className="text-sm text-red-400 mt-1">错误: {step.error}</p>
+                              )}
+                            </div>
+
+                            <span className={`text-xs px-2 py-1 rounded ${
+                              step.status === 'done'
+                                ? 'bg-green-500/20 text-green-400'
+                                : step.status === 'doing'
+                                ? 'bg-blue-500/20 text-blue-400'
+                                : step.status === 'error'
+                                ? 'bg-red-500/20 text-red-400'
+                                : 'bg-cyber-grid/30 text-cyber-muted'
+                            }`}>
+                              {step.status === 'done' ? '完成' : 
+                               step.status === 'doing' ? '进行中' : 
+                               step.status === 'error' ? '错误' : 
+                               step.status === 'todo' ? '待处理' : '初始化'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 底部按钮 */}
+                  <div className="flex justify-end mt-6">
+                    {installProgress.allDone || installProgress.hasError ? (
+                      <button
+                        onClick={closeInstallProgress}
+                        className="px-6 py-2 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 transition-all">
+                        关闭
+                      </button>
+                    ) : (
+                      <button
+                        onClick={closeInstallProgress}
+                        className="px-6 py-2 border border-cyber-accent/30 rounded-lg text-cyber-text hover:bg-cyber-grid/50 transition-all">
+                        后台运行
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </motion.div>
           </div>
         )}

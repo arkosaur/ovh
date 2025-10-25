@@ -58,7 +58,8 @@ apiClient.interceptors.response.use(
           toast.error('访问被拒绝：权限不足');
           break;
         case 404:
-          toast.error('资源不存在');
+          // 404完全静默，让各组件自行处理
+          // 因为404可能是正常情况（如：检查安装进度时没有进行中的安装）
           break;
         case 500:
           toast.error('服务器错误');
