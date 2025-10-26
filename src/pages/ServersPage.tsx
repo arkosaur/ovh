@@ -1532,7 +1532,7 @@ const ServersPage = () => {
           </svg>
           <p className="text-sm text-slate-100">
             <span className="text-cyber-accent font-medium">可用性检测说明：</span> 
-            可用性检测仅针对服务器默认配置，若设置了自定义配置，实际库存状态将以进入抢购队列时为准。建议选择多个数据中心以提高抢购成功率。
+            可用性检测已校准！缺省配置与可选配置均可准确检测可用性！
           </p>
         </div>
       </div>
