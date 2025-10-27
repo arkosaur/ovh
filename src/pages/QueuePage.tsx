@@ -4,6 +4,7 @@ import { useAPI } from "@/context/APIContext";
 import { api } from "@/utils/apiClient";
 import { toast } from "sonner";
 import { XIcon, RefreshCwIcon, PlusIcon, SearchIcon, PlayIcon, PauseIcon, Trash2Icon, ArrowUpDownIcon, HeartIcon } from 'lucide-react';
+import { useIsMobile } from "@/hooks/use-mobile";
 import { 
   API_URL, 
   TASK_RETRY_INTERVAL, 
@@ -49,6 +50,7 @@ interface ServerPlan {
 }
 
 const QueuePage = () => {
+  const isMobile = useIsMobile();
   const { isAuthenticated } = useAPI();
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -238,18 +240,18 @@ const QueuePage = () => {
   };
 
   return (
-    <div className="space-y-6 p-4 md:p-6 bg-cyber-background text-cyber-text min-h-screen">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mb-1 cyber-glow-text">抢购队列</h1>
-        <p className="text-cyber-muted mb-6">管理自动抢购服务器的队列</p>
+        <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold mb-1 cyber-glow-text`}>抢购队列</h1>
+        <p className="text-cyber-muted text-sm mb-4 sm:mb-6">管理自动抢购服务器的队列</p>
       </div>
 
       {/* Controls */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
         <div className="flex gap-2">
           <button
             onClick={() => fetchQueueItems()}
-            className="cyber-button text-xs flex items-center"
+            className="cyber-button text-xs flex items-center flex-1 sm:flex-initial justify-center"
             disabled={isLoading}
           >
             <RefreshCwIcon size={12} className="mr-1" />
@@ -258,17 +260,18 @@ const QueuePage = () => {
           {queueItems.length > 0 && (
             <button
               onClick={clearAllQueue}
-              className="cyber-button text-xs flex items-center bg-red-500/20 hover:bg-red-500/30 text-red-400 border-red-500/30"
+              className="cyber-button text-xs flex items-center bg-red-500/20 hover:bg-red-500/30 text-red-400 border-red-500/30 flex-1 sm:flex-initial justify-center"
               disabled={isLoading}
             >
               <Trash2Icon size={12} className="mr-1" />
-              清空队列
+              {!isMobile && '清空队列'}
+              {isMobile && '清空'}
             </button>
           )}
         </div>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="cyber-button text-xs flex items-center bg-cyber-primary hover:bg-cyber-primary-dark text-white"
+          className="cyber-button text-xs flex items-center bg-cyber-primary hover:bg-cyber-primary-dark text-white justify-center"
         >
           <PlusIcon size={14} className="mr-1" />
           添加新任务
@@ -277,16 +280,16 @@ const QueuePage = () => {
 
       {/* Add Form */}
       {showAddForm && (
-        <div className="bg-cyber-surface-dark p-6 rounded-lg shadow-xl border border-cyber-border relative">
+        <div className="bg-cyber-surface-dark p-4 sm:p-6 rounded-lg shadow-xl border border-cyber-border relative">
           <button 
             onClick={() => setShowAddForm(false)} 
-            className="absolute top-3 right-3 text-cyber-muted hover:text-cyber-text transition-colors"
+            className="absolute top-2 right-2 sm:top-3 sm:right-3 text-cyber-muted hover:text-cyber-text transition-colors"
           >
-            <XIcon size={20} />
+            <XIcon size={isMobile ? 18 : 20} />
           </button>
-          <h2 className="text-xl font-semibold mb-6 text-cyber-primary-accent">添加抢购任务</h2>
+          <h2 className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold mb-4 sm:mb-6 text-cyber-primary-accent pr-8`}>添加抢购任务</h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
             {/* Left Column: Plan Code & Retry Interval */}
             <div className="md:col-span-1 space-y-6">
               <div>

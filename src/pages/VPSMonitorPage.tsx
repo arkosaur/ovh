@@ -4,6 +4,7 @@ import { api } from '@/utils/apiClient';
 import { toast } from 'sonner';
 import { Bell, BellOff, Plus, Trash2, Settings, Clock, RefreshCw, History, ChevronDown, ChevronUp, Server } from 'lucide-react';
 import { useAPI } from '@/context/APIContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface VPSSubscription {
   id: string;
@@ -35,6 +36,7 @@ interface HistoryEntry {
 }
 
 const VPSMonitorPage = () => {
+  const isMobile = useIsMobile();
   const { isAuthenticated } = useAPI();
   const [subscriptions, setSubscriptions] = useState<VPSSubscription[]>([]);
   const [monitorStatus, setMonitorStatus] = useState<MonitorStatus>({
@@ -220,32 +222,32 @@ const VPSMonitorPage = () => {
   }, [isAuthenticated]);
 
   return (
-    <div className="space-y-6 p-4 md:p-6 bg-cyber-background text-cyber-text min-h-screen">
+    <div className="space-y-4 sm:space-y-6">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <h1 className="text-3xl font-bold mb-1 cyber-glow-text">VPS补货通知</h1>
-        <p className="text-cyber-muted mb-6">选择VPS型号（VPS-1至VPS-6），自动监控所有数据中心的库存变化</p>
+        <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold mb-1 cyber-glow-text`}>VPS补货通知</h1>
+        <p className="text-cyber-muted text-sm mb-4 sm:mb-6">选择VPS型号，自动监控所有数据中心的库存变化</p>
       </motion.div>
 
       {/* 监控状态卡片 */}
-      <div className="cyber-panel p-4">
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex items-center gap-3">
+      <div className="cyber-panel p-3 sm:p-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0 mb-4">
+          <div className="flex items-center gap-2 sm:gap-3">
             {monitorStatus.running ? (
-              <div className="p-2 bg-green-500/20 rounded">
-                <Bell className="text-green-400" size={24} />
+              <div className="p-1.5 sm:p-2 bg-green-500/20 rounded">
+                <Bell className="text-green-400" size={isMobile ? 20 : 24} />
               </div>
             ) : (
-              <div className="p-2 bg-gray-500/20 rounded">
-                <BellOff className="text-gray-400" size={24} />
+              <div className="p-1.5 sm:p-2 bg-gray-500/20 rounded">
+                <BellOff className="text-gray-400" size={isMobile ? 20 : 24} />
               </div>
             )}
             <div>
-              <h3 className="text-lg font-semibold">VPS监控状态</h3>
-              <p className="text-sm text-cyber-muted">
+              <h3 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}>VPS监控状态</h3>
+              <p className="text-xs sm:text-sm text-cyber-muted">
                 {monitorStatus.running ? (
                   <span className="text-green-400">● 运行中</span>
                 ) : (

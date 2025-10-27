@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Search, Database, Filter, Download, TrendingUp } from 'lucide-react';
+import { RefreshCw, Search, Database, Filter, Download, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 /**
  * OVH 数据中心可用性查询页面
@@ -27,12 +28,13 @@ interface AvailabilityItem {
 }
 
 const OVHAvailabilityPage = () => {
+  const isMobile = useIsMobile();
   const [availabilities, setAvailabilities] = useState<AvailabilityItem[]>([]);
-  const [filteredData, setFilteredData] = useState<AvailabilityItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
   // 搜索和过滤
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterDatacenter, setFilterDatacenter] = useState('all');
   const [filterAvailability, setFilterAvailability] = useState('all');
   const [filterMemory, setFilterMemory] = useState('all');
@@ -40,6 +42,24 @@ const OVHAvailabilityPage = () => {
   // 排序
   const [sortBy, setSortBy] = useState<'planCode' | 'memory' | 'availability'>('planCode');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  // 分页
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = isMobile ? 20 : 50;
+  
+  // 搜索防抖
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1); // 搜索时重置页码
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+  
+  // 过滤条件改变时重置页码
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterDatacenter, filterAvailability, filterMemory, sortBy, sortOrder]);
 
   // OVH API 端点
   const OVH_API_URL = 'https://eu.api.ovh.com/v1/dedicated/server/datacenter/availabilities';
@@ -57,7 +77,6 @@ const OVHAvailabilityPage = () => {
       
       console.log('OVH API 返回数据:', response.data);
       setAvailabilities(response.data);
-      setFilteredData(response.data);
       toast.success(`成功获取 ${response.data.length} 条可用性记录`);
     } catch (error: any) {
       console.error('获取 OVH 数据失败:', error);
@@ -80,13 +99,13 @@ const OVHAvailabilityPage = () => {
     fetchAvailabilities();
   }, []);
 
-  // 应用过滤和搜索
-  useEffect(() => {
+  // 使用useMemo优化过滤和排序
+  const filteredData = useMemo(() => {
     let filtered = [...availabilities];
     
-    // 搜索过滤
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
+    // 搜索过滤（使用防抖后的搜索词）
+    if (debouncedSearch) {
+      const term = debouncedSearch.toLowerCase();
       filtered = filtered.filter(item =>
         item.planCode.toLowerCase().includes(term) ||
         item.server.toLowerCase().includes(term) ||
@@ -170,8 +189,17 @@ const OVHAvailabilityPage = () => {
       return sortOrder === 'asc' ? compareValue : -compareValue;
     });
     
-    setFilteredData(filtered);
-  }, [availabilities, searchTerm, filterDatacenter, filterAvailability, filterMemory, sortBy, sortOrder]);
+    return filtered;
+  }, [availabilities, debouncedSearch, filterDatacenter, filterAvailability, filterMemory, sortBy, sortOrder]);
+  
+  // 分页数据
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredData.slice(startIndex, endIndex);
+  }, [filteredData, currentPage, itemsPerPage]);
+  
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
   // 导出数据为 JSON
   const exportData = () => {
@@ -228,10 +256,10 @@ const OVHAvailabilityPage = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold mb-1 cyber-glow-text">OVH 实时可用性</h1>
-            <p className="text-cyber-muted">直接查询 OVH 公开 API（无需认证）</p>
+            <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold mb-1 cyber-glow-text`}>OVH 实时可用性</h1>
+            <p className="text-cyber-muted text-sm">直接查询 OVH 公开 API（无需认证）</p>
           </div>
           
           <div className="flex gap-2">
@@ -240,19 +268,20 @@ const OVHAvailabilityPage = () => {
               disabled={filteredData.length === 0}
               variant="cyber"
               size="sm"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 text-xs sm:text-sm"
             >
-              <Download className="w-4 h-4" />
-              导出JSON
+              <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+              {!isMobile && '导出JSON'}
             </Button>
             <Button
               onClick={fetchAvailabilities}
               disabled={isLoading}
               variant="cyber"
-              className="flex items-center gap-2"
+              size="sm"
+              className="flex items-center gap-2 text-xs sm:text-sm"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              {isLoading ? '加载中...' : '刷新数据'}
+              <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              {isLoading ? '加载中' : '刷新'}
             </Button>
           </div>
         </div>
@@ -284,44 +313,47 @@ const OVHAvailabilityPage = () => {
 
       {/* 统计卡片 */}
       {availabilities.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="cyber-panel p-4">
-            <div className="flex items-center gap-2 text-cyber-muted text-sm mb-1">
-              <Database className="w-4 h-4" />
-              总记录数
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+          <div className="cyber-panel p-2 sm:p-4">
+            <div className="flex items-center gap-1 sm:gap-2 text-cyber-muted text-xs sm:text-sm mb-1">
+              <Database className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">总记录数</span>
+              <span className="sm:hidden">总数</span>
             </div>
-            <div className="text-2xl font-bold text-cyber-accent">{stats.total}</div>
+            <div className="text-lg sm:text-2xl font-bold text-cyber-accent">{stats.total}</div>
           </div>
-          <div className="cyber-panel p-4">
-            <div className="flex items-center gap-2 text-cyber-muted text-sm mb-1">
-              <TrendingUp className="w-4 h-4" />
-              有货服务器
+          <div className="cyber-panel p-2 sm:p-4">
+            <div className="flex items-center gap-1 sm:gap-2 text-cyber-muted text-xs sm:text-sm mb-1">
+              <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">有货服务器</span>
+              <span className="sm:hidden">有货</span>
             </div>
-            <div className="text-2xl font-bold text-green-400">{stats.available}</div>
+            <div className="text-lg sm:text-2xl font-bold text-green-400">{stats.available}</div>
           </div>
-          <div className="cyber-panel p-4">
-            <div className="flex items-center gap-2 text-cyber-muted text-sm mb-1">
-              <Filter className="w-4 h-4" />
-              1小时内
+          <div className="cyber-panel p-2 sm:p-4">
+            <div className="flex items-center gap-1 sm:gap-2 text-cyber-muted text-xs sm:text-sm mb-1">
+              <Filter className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">1小时内</span>
+              <span className="sm:hidden">1H内</span>
             </div>
-            <div className="text-2xl font-bold text-yellow-400">{stats.oneHour}</div>
+            <div className="text-lg sm:text-2xl font-bold text-yellow-400">{stats.oneHour}</div>
           </div>
         </div>
       )}
 
       {/* 搜索和过滤器 */}
       {availabilities.length > 0 && (
-        <div className="cyber-panel p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="cyber-panel p-3 sm:p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
             {/* 搜索框 */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cyber-muted" />
+            <div className="relative sm:col-span-2 lg:col-span-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 sm:w-4 sm:h-4 text-cyber-muted" />
               <input
                 type="text"
-                placeholder="搜索服务器、内存、存储..."
+                placeholder={isMobile ? "搜索..." : "搜索服务器、内存、存储..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="cyber-input pl-10 w-full"
+                className="cyber-input pl-8 sm:pl-10 w-full text-sm"
               />
             </div>
             
@@ -443,59 +475,59 @@ const OVHAvailabilityPage = () => {
           <p className="text-sm text-slate-500">尝试修改搜索或过滤条件</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {filteredData.map((item, index) => (
-            <motion.div
-              key={item.fqn || index}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: Math.min(index * 0.02, 0.5) }}
-              className="cyber-panel p-4 hover:border-cyber-accent/50 transition-colors"
-            >
-              <div className="mb-3">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <h3 className="text-lg font-bold text-cyber-accent">{item.planCode}</h3>
-                    <p className="text-sm text-cyber-muted">{item.server}</p>
+        <>
+          <div className="space-y-2 sm:space-y-3">
+            {paginatedData.map((item, index) => (
+              <div
+                key={item.fqn || index}
+                className="cyber-panel p-3 sm:p-4 hover:border-cyber-accent/50 transition-colors"
+              >
+              <div className="mb-2 sm:mb-3">
+                <div className="flex items-start justify-between mb-2 gap-2">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base sm:text-lg font-bold text-cyber-accent truncate">{item.planCode}</h3>
+                    <p className="text-xs sm:text-sm text-cyber-muted line-clamp-1">{item.server}</p>
                   </div>
-                  <div className="text-right text-xs text-cyber-muted">
-                    <div className="font-mono">{item.fqn}</div>
-                  </div>
+                  {!isMobile && (
+                    <div className="text-right text-xs text-cyber-muted flex-shrink-0">
+                      <div className="font-mono">{item.fqn}</div>
+                    </div>
+                  )}
                 </div>
                 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2 text-xs sm:text-sm">
                   <div>
                     <span className="text-cyber-muted">内存：</span>
-                    <span className="text-slate-300 ml-2">{item.memory}</span>
+                    <span className="text-slate-300 ml-1 sm:ml-2">{item.memory}</span>
                   </div>
                   <div>
                     <span className="text-cyber-muted">存储：</span>
-                    <span className="text-slate-300 ml-2">{item.storage}</span>
+                    <span className="text-slate-300 ml-1 sm:ml-2">{item.storage}</span>
                   </div>
                   {item.systemStorage && (
                     <div>
                       <span className="text-cyber-muted">系统盘：</span>
-                      <span className="text-slate-300 ml-2">{item.systemStorage}</span>
+                      <span className="text-slate-300 ml-1 sm:ml-2">{item.systemStorage}</span>
                     </div>
                   )}
                 </div>
               </div>
               
-              <div className="cyber-grid-line pt-3">
+              <div className="cyber-grid-line pt-2 sm:pt-3">
                 <h4 className="text-xs font-semibold text-cyber-muted mb-2">
                   数据中心可用性 ({item.datacenters.length} 个)
                 </h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-2">
                   {item.datacenters.map((dc) => {
                     const availInfo = getAvailabilityInfo(dc.availability);
                     
                     return (
                       <div
                         key={dc.datacenter}
-                        className={`${availInfo.bg} ${availInfo.border} border rounded px-2 py-1.5 text-xs`}
+                        className={`${availInfo.bg} ${availInfo.border} border rounded px-1.5 sm:px-2 py-1 sm:py-1.5 text-xs`}
                       >
-                        <div className="font-semibold text-slate-200">{dc.datacenter.toUpperCase()}</div>
-                        <div className={`${availInfo.color} text-[10px] font-medium`}>
+                        <div className="font-semibold text-slate-200 text-[10px] sm:text-xs">{dc.datacenter.toUpperCase()}</div>
+                        <div className={`${availInfo.color} text-[9px] sm:text-[10px] font-medium`}>
                           {availInfo.text}
                         </div>
                       </div>
@@ -503,9 +535,77 @@ const OVHAvailabilityPage = () => {
                   })}
                 </div>
               </div>
-            </motion.div>
-          ))}
-        </div>
+            </div>
+            ))}
+          </div>
+          
+          {/* 分页控件 */}
+          {totalPages > 1 && (
+            <div className="cyber-panel p-3 sm:p-4 mt-3 sm:mt-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+                <div className="text-xs sm:text-sm text-cyber-muted">
+                  {isMobile ? (
+                    <>{currentPage}/{totalPages}</>
+                  ) : (
+                    <>显示 {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredData.length)} / 共 {filteredData.length} 条</>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  {!isMobile && (
+                    <Button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      variant="cyber"
+                      size="sm"
+                      className="px-3 text-xs"
+                    >
+                      首页
+                    </Button>
+                  )}
+                  
+                  <Button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    variant="cyber"
+                    size="sm"
+                    className="px-2"
+                  >
+                    <ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />
+                  </Button>
+                  
+                  <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 bg-cyber-grid/30 rounded text-xs sm:text-sm">
+                    <span className="text-cyber-accent font-medium">{currentPage}</span>
+                    <span className="text-cyber-muted">/</span>
+                    <span className="text-cyber-muted">{totalPages}</span>
+                  </div>
+                  
+                  <Button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    variant="cyber"
+                    size="sm"
+                    className="px-2"
+                  >
+                    <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
+                  </Button>
+                  
+                  {!isMobile && (
+                    <Button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      variant="cyber"
+                      size="sm"
+                      className="px-3 text-xs"
+                    >
+                      末页
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

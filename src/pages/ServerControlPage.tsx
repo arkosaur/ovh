@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/utils/apiClient";
 import { useToast } from "../components/ToastContainer";
 import { Server, RefreshCw, Power, HardDrive, X, AlertCircle, Activity, Cpu, Wifi, Calendar, Monitor, Mail } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ServerInfo {
   serviceName: string;
@@ -76,6 +77,7 @@ interface InstallProgress {
 }
 
 const ServerControlPage: React.FC = () => {
+  const isMobile = useIsMobile();
   const { showToast, showConfirm } = useToast();
   const [servers, setServers] = useState<ServerInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -792,20 +794,20 @@ const ServerControlPage: React.FC = () => {
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
         {/* 页面标题 */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-cyber-accent/10 rounded-lg border border-cyber-accent/30">
-              <Server className="text-cyber-accent" size={24} />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 bg-cyber-accent/10 rounded-lg border border-cyber-accent/30">
+              <Server className="text-cyber-accent" size={isMobile ? 20 : 24} />
             </div>
             <div>
-              <h1 className="text-3xl font-bold cyber-glow-text">服务器控制中心</h1>
-              <p className="text-cyber-muted text-sm">管理您的 OVH 独立服务器</p>
+              <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold cyber-glow-text`}>服务器控制中心</h1>
+              <p className="text-cyber-muted text-xs sm:text-sm">管理您的 OVH 独立服务器</p>
             </div>
           </div>
           <button
             onClick={fetchServers}
             disabled={isLoading}
-            className="px-4 py-2 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 disabled:opacity-50 flex items-center gap-2 transition-all shadow-neon-sm">
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 disabled:opacity-50 flex items-center gap-2 transition-all shadow-neon-sm text-xs sm:text-sm">
+            <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 ${isLoading ? 'animate-spin' : ''}`} />
             刷新
           </button>
         </div>
@@ -855,8 +857,8 @@ const ServerControlPage: React.FC = () => {
             {selectedServer && (
               <>
               <div className="cyber-card">
-                <h3 className="text-lg font-semibold text-cyber-text mb-4">服务器信息</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm mb-6">
+                <h3 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-cyber-text mb-3 sm:mb-4`}>服务器信息</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm mb-4 sm:mb-6">
                   <div>
                     <span className="text-cyber-muted">服务名称:</span>
                     <span className="text-cyber-text ml-2">{selectedServer.serviceName}</span>

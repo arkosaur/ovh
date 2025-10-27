@@ -4,8 +4,10 @@ import { useAPI } from "@/context/APIContext";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { CacheManager } from "@/components/CacheManager";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const SettingsPage = () => {
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const { 
     appKey, 
@@ -112,14 +114,14 @@ const SettingsPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <h1 className="text-3xl font-bold mb-1 cyber-glow-text">API设置</h1>
-        <p className="text-cyber-muted mb-6">配置OVH API和通知设置</p>
+        <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold mb-1 cyber-glow-text`}>API设置</h1>
+        <p className="text-cyber-muted text-sm mb-4 sm:mb-6">配置OVH API和通知设置</p>
       </motion.div>
 
       {isLoading ? (
@@ -128,15 +130,15 @@ const SettingsPage = () => {
           <span className="ml-3 text-cyber-muted">加载中...</span>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2">
-            <form onSubmit={handleSubmit} className="cyber-panel p-6 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="lg:col-span-2">
+            <form onSubmit={handleSubmit} className="cyber-panel p-4 sm:p-6 space-y-4 sm:space-y-6">
               <div>
-                <h2 className="text-xl font-bold mb-4">OVH API 凭据</h2>
+                <h2 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold mb-3 sm:mb-4`}>OVH API 凭据</h2>
                 
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <div>
-                    <label className="block text-cyber-muted mb-1">
+                    <label className="block text-cyber-muted mb-1 text-xs sm:text-sm">
                       应用密钥 (APP KEY) <span className="text-red-400">*</span>
                     </label>
                     <div className="relative">
@@ -145,7 +147,7 @@ const SettingsPage = () => {
                         name="appKey"
                         value={formValues.appKey}
                         onChange={handleChange}
-                        className="cyber-input w-full pr-10"
+                        className="cyber-input w-full pr-10 text-sm"
                         placeholder="xxxxxxxxxxxxxxxx"
                         required
                       />

@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { api } from "@/utils/apiClient";
 import { toast } from "sonner";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface LogEntry {
   id: string;
@@ -12,6 +13,7 @@ interface LogEntry {
 }
 
 const LogsPage = () => {
+  const isMobile = useIsMobile();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -119,28 +121,28 @@ const LogsPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mb-1 cyber-glow-text">详细日志</h1>
-        <p className="text-cyber-muted mb-6">查看系统运行日志记录</p>
+        <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold mb-1 cyber-glow-text`}>详细日志</h1>
+        <p className="text-cyber-muted text-sm mb-4 sm:mb-6">查看系统运行日志记录</p>
       </div>
 
       {/* Filters and controls */}
-      <div className="cyber-panel p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative">
+      <div className="cyber-panel p-3 sm:p-4 mb-4 sm:mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <div className="relative sm:col-span-2 lg:col-span-1">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-muted">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-muted">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
             </div>
             <input
               type="text"
-              placeholder="搜索日志内容..."
+              placeholder={isMobile ? "搜索..." : "搜索日志内容..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="cyber-input pl-10 w-full"
+              className="cyber-input pl-9 w-full text-sm"
             />
           </div>
           
@@ -148,7 +150,7 @@ const LogsPage = () => {
             <select
               value={filterLevel}
               onChange={(e) => setFilterLevel(e.target.value)}
-              className="cyber-input w-full"
+              className="cyber-input w-full text-sm"
             >
               <option value="all">所有级别</option>
               <option value="INFO">INFO</option>
@@ -158,41 +160,42 @@ const LogsPage = () => {
             </select>
           </div>
           
-          <div className="flex items-center justify-end space-x-2">
-            <div className="flex items-center mr-2">
-              <label className="cursor-pointer flex items-center space-x-2 text-cyber-muted hover:text-cyber-text transition-colors text-sm">
+          <div className="flex items-center justify-between sm:justify-end space-x-2 sm:col-span-2 lg:col-span-1">
+            <div className="flex items-center">
+              <label className="cursor-pointer flex items-center space-x-1.5 sm:space-x-2 text-cyber-muted hover:text-cyber-text transition-colors text-xs sm:text-sm">
                 <input
                   type="checkbox"
                   checked={autoRefresh}
                   onChange={() => setAutoRefresh(!autoRefresh)}
-                  className="form-checkbox cyber-input h-4 w-4"
+                  className="form-checkbox cyber-input h-3.5 w-3.5 sm:h-4 sm:w-4"
                 />
-                <span>自动刷新</span>
+                <span className="hidden sm:inline">自动刷新</span>
+                <span className="sm:hidden">自动</span>
               </label>
             </div>
             
             <button
               onClick={() => fetchLogs()}
-              className="cyber-button text-xs flex items-center"
+              className="cyber-button text-xs flex items-center px-2 sm:px-3"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="sm:mr-1">
                 <polyline points="1 4 1 10 7 10"></polyline>
                 <polyline points="23 20 23 14 17 14"></polyline>
                 <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
               </svg>
-              刷新
+              <span className="hidden sm:inline">刷新</span>
             </button>
             
             <button
               onClick={clearLogs}
-              className="cyber-button text-xs flex items-center bg-red-500/10 border-red-500/30 hover:border-red-500/50"
+              className="cyber-button text-xs flex items-center bg-red-500/10 border-red-500/30 hover:border-red-500/50 px-2 sm:px-3"
               disabled={isLoading || logs.length === 0}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="sm:mr-1">
                 <path d="M3 6h18"></path>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               </svg>
-              清空
+              <span className="hidden sm:inline">清空</span>
             </button>
           </div>
         </div>
@@ -200,13 +203,13 @@ const LogsPage = () => {
 
       {/* Logs display */}
       <div className="cyber-panel">
-        <div className="flex justify-between items-center px-3 py-2 border-b border-cyber-grid/30 bg-cyber-grid/5">
-          <h2 className="font-semibold text-sm">系统日志</h2>
-          <div className="flex items-center gap-3">
-            <div className="text-cyber-muted text-xs">
-              共 {filteredLogs.length} 条
+        <div className="flex justify-between items-center px-2 sm:px-3 py-2 border-b border-cyber-grid/30 bg-cyber-grid/5">
+          <h2 className="font-semibold text-xs sm:text-sm">系统日志</h2>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="text-cyber-muted text-[10px] sm:text-xs">
+              {filteredLogs.length} 条
             </div>
-            {logs.length > 0 && (
+            {logs.length > 0 && !isMobile && (
               <div className="text-[10px] text-cyber-accent/60">
                 最新: {new Date(logs[logs.length - 1]?.timestamp).toLocaleTimeString()}
               </div>
@@ -232,48 +235,83 @@ const LogsPage = () => {
             <p className="text-cyber-muted">没有日志记录</p>
           </div>
         ) : (
-          <div className="max-h-[600px] overflow-y-auto">
+          <div className="max-h-[400px] sm:max-h-[600px] overflow-y-auto overflow-x-hidden">
             <div className="divide-y divide-cyber-grid/10">
               {filteredLogs.map((log, index) => (
                 <div
                   key={log.id}
-                  className="px-3 py-2 hover:bg-cyber-grid/5 transition-colors"
+                  className="px-2 sm:px-3 py-2 hover:bg-cyber-grid/5 transition-colors"
                 >
-                  <div className="flex items-start gap-2 text-xs">
-                    {/* 序号 */}
-                    <div className="flex-shrink-0 w-10 text-cyber-muted/60 text-right font-mono">
-                      {filteredLogs.length - index}
+                  {isMobile ? (
+                    /* 移动端：卡片布局 */
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-cyber-muted/60 font-mono text-[10px]">
+                            #{filteredLogs.length - index}
+                          </span>
+                          <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9px] font-semibold ${getLogLevelStyle(log.level)}`}>
+                            {log.level}
+                          </span>
+                        </div>
+                        <div className="text-cyber-muted font-mono text-[10px]">
+                          {new Date(log.timestamp).toLocaleString('zh-CN', {
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                          }).replace(/\//g, '-')}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-cyber-accent/80 font-mono text-[10px]" title={log.source}>
+                          {log.source}
+                        </span>
+                      </div>
+                      <div className="text-slate-200 text-xs leading-relaxed break-words">
+                        {log.message}
+                      </div>
                     </div>
-                    
-                    {/* 时间戳 */}
-                    <div className="flex-shrink-0 w-32 text-cyber-muted font-mono">
-                      {new Date(log.timestamp).toLocaleString('zh-CN', {
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: false
-                      }).replace(/\//g, '-')}
+                  ) : (
+                    /* 桌面端：列表布局 */
+                    <div className="flex items-start gap-2 text-xs">
+                      {/* 序号 */}
+                      <div className="flex-shrink-0 w-10 text-cyber-muted/60 text-right font-mono">
+                        {filteredLogs.length - index}
+                      </div>
+                      
+                      {/* 时间戳 */}
+                      <div className="flex-shrink-0 w-32 text-cyber-muted font-mono">
+                        {new Date(log.timestamp).toLocaleString('zh-CN', {
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                          hour12: false
+                        }).replace(/\//g, '-')}
+                      </div>
+                      
+                      {/* 级别 */}
+                      <div className="flex-shrink-0">
+                        <span className={`inline-flex items-center justify-center w-16 px-1.5 py-0.5 rounded text-[10px] font-semibold ${getLogLevelStyle(log.level)}`}>
+                          {log.level}
+                        </span>
+                      </div>
+                      
+                      {/* 来源 */}
+                      <div className="flex-shrink-0 w-20 text-cyber-accent/80 font-mono text-[10px] truncate" title={log.source}>
+                        {log.source}
+                      </div>
+                      
+                      {/* 消息 */}
+                      <div className="flex-1 text-slate-200 leading-relaxed break-words">
+                        {log.message}
+                      </div>
                     </div>
-                    
-                    {/* 级别 */}
-                    <div className="flex-shrink-0">
-                      <span className={`inline-flex items-center justify-center w-16 px-1.5 py-0.5 rounded text-[10px] font-semibold ${getLogLevelStyle(log.level)}`}>
-                        {log.level}
-                      </span>
-                    </div>
-                    
-                    {/* 来源 */}
-                    <div className="flex-shrink-0 w-20 text-cyber-accent/80 font-mono text-[10px] truncate" title={log.source}>
-                      {log.source}
-                    </div>
-                    
-                    {/* 消息 */}
-                    <div className="flex-1 text-slate-200 leading-relaxed break-words">
-                      {log.message}
-                    </div>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
