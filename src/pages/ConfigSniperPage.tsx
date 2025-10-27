@@ -241,7 +241,7 @@ const ConfigSniperPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-hidden">
       {/* 标题 */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -333,8 +333,8 @@ const ConfigSniperPage: React.FC = () => {
             </button>
           </div>
           
-          <div className="mb-4 p-3 sm:p-4 bg-cyber-accent/10 border border-cyber-accent/30 rounded-lg">
-            <p className="text-cyber-text text-xs sm:text-sm break-words">
+          <div className="mb-4 p-3 sm:p-4 bg-cyber-accent/10 border border-cyber-accent/30 rounded-lg overflow-hidden">
+            <p className="text-cyber-text text-xs sm:text-sm break-words overflow-wrap-anywhere">
               <strong>型号:</strong> {planCode}
               <br className="sm:hidden" />
               <span className="hidden sm:inline"> | </span>
@@ -347,13 +347,13 @@ const ConfigSniperPage: React.FC = () => {
               <div
                 key={index}
                 onClick={() => setSelectedConfig(config)}
-                className={`border-2 rounded-lg p-3 sm:p-4 cursor-pointer transition-all ${
+                className={`border-2 rounded-lg p-3 sm:p-4 cursor-pointer transition-all overflow-hidden ${
                   selectedConfig === config
                     ? 'border-cyber-accent bg-cyber-accent/5 shadow-neon'
                     : 'border-cyber-accent/30 hover:border-cyber-accent/50 bg-cyber-grid/30'
                 }`}
               >
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between min-w-0">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 sm:gap-4 mb-2">
                       <input
@@ -371,11 +371,11 @@ const ConfigSniperPage: React.FC = () => {
                     </div>
                     
                     {config.matched_api2.length > 0 && (
-                      <div className="ml-6 sm:ml-9 mt-3">
+                      <div className="ml-6 sm:ml-9 mt-3 overflow-hidden">
                         <p className="text-xs sm:text-sm text-cyber-muted mb-2">
                           匹配的 API2 型号 ({config.match_count} 个) - 点击立即下单:
                         </p>
-                        <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                        <div className="flex flex-wrap gap-1.5 sm:gap-2 max-w-full">
                           {config.matched_api2.map((item, idx) => (
                             item.datacenters.map((dc, dcIdx) => (
                               <button
@@ -384,10 +384,10 @@ const ConfigSniperPage: React.FC = () => {
                                   e.stopPropagation();
                                   handleQuickOrder(item.planCode, dc);
                                 }}
-                                className="px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs rounded bg-gradient-to-br from-cyber-grid to-cyber-grid/30 border-2 border-cyber-accent/40 hover:border-cyber-accent hover:shadow-neon-md hover:scale-105 active:scale-95 transition-all flex flex-col items-center gap-0.5 min-w-[75px] sm:min-w-[90px] group"
+                                className="px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs rounded bg-gradient-to-br from-cyber-grid to-cyber-grid/30 border-2 border-cyber-accent/40 hover:border-cyber-accent hover:shadow-neon-md hover:scale-105 active:scale-95 transition-all flex flex-col items-center gap-0.5 min-w-[70px] max-w-[85px] sm:min-w-[85px] sm:max-w-[100px] group flex-shrink-0"
                               >
-                                <span className="font-bold text-cyber-accent group-hover:text-white transition-colors text-[10px] sm:text-xs truncate max-w-full">{item.planCode}</span>
-                                <span className="text-[9px] sm:text-xs text-cyber-muted group-hover:text-cyan-200 transition-colors">@{dc.toUpperCase()}</span>
+                                <span className="font-bold text-cyber-accent group-hover:text-white transition-colors text-[10px] sm:text-xs truncate w-full text-center">{item.planCode}</span>
+                                <span className="text-[9px] sm:text-xs text-cyber-muted group-hover:text-cyan-200 transition-colors truncate w-full text-center">@{dc.toUpperCase()}</span>
                               </button>
                             ))
                           ))}
@@ -507,30 +507,32 @@ const ConfigSniperPage: React.FC = () => {
           ) : (
             <div className="space-y-4">
               {tasks.map((task) => (
-                <div key={task.id} className="border border-cyber-accent/30 rounded-lg p-4 bg-cyber-grid/30 hover:bg-cyber-grid/50 transition-all">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-cyber-text">{task.api1_planCode}</h3>
-                        {getMatchStatusBadge(task.match_status)}
-                        {task.match_status !== 'completed' && (
-                          <span className={`px-2 py-1 text-xs rounded border ${
-                            task.enabled 
-                              ? 'bg-green-400/10 text-green-400 border-green-400/30' 
-                              : 'bg-cyber-grid text-cyber-muted border-cyber-accent/20'
-                          }`}>
-                            {task.enabled ? '● 监控中' : '○ 已暂停'}
-                          </span>
-                        )}
+                <div key={task.id} className="border border-cyber-accent/30 rounded-lg p-4 bg-cyber-grid/30 hover:bg-cyber-grid/50 transition-all overflow-hidden">
+                  <div className="flex items-start justify-between gap-3 min-w-0">
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <h3 className="text-base sm:text-lg font-semibold text-cyber-text break-words">{task.api1_planCode}</h3>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {getMatchStatusBadge(task.match_status)}
+                          {task.match_status !== 'completed' && (
+                            <span className={`px-2 py-1 text-xs rounded border whitespace-nowrap flex-shrink-0 ${
+                              task.enabled 
+                                ? 'bg-green-400/10 text-green-400 border-green-400/30' 
+                                : 'bg-cyber-grid text-cyber-muted border-cyber-accent/20'
+                            }`}>
+                              {task.enabled ? '● 监控中' : '○ 已暂停'}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="text-sm text-cyber-muted space-y-1">
-                        <p>
+                      <div className="text-xs sm:text-sm text-cyber-muted space-y-1 overflow-hidden">
+                        <p className="break-words">
                           <strong className="text-cyber-text">绑定配置:</strong> {task.bound_config.memory} + {task.bound_config.storage}
                         </p>
                         
                         {task.match_status === 'matched' && task.matched_api2.length > 0 && (
-                          <p>
+                          <p className="break-words">
                             <strong className="text-cyber-text">匹配结果:</strong> 找到 {task.matched_api2.length} 个 API2 planCode
                             <span className="ml-2 text-xs text-cyber-muted">
                               (配置匹配，监控可用性)
@@ -539,54 +541,54 @@ const ConfigSniperPage: React.FC = () => {
                         )}
                         
                         {task.match_status === 'completed' && (
-                          <p className="text-blue-400">
+                          <p className="text-blue-400 break-words">
                             <strong>✓ 任务已完成：</strong>已发现可用服务器并加入购买队列
                           </p>
                         )}
                         
-                        <p>
+                        <p className="break-words">
                           <strong className="text-cyber-text">创建时间:</strong> {new Date(task.created_at).toLocaleString('zh-CN')}
                         </p>
                         
                         {task.last_check && (
-                          <p>
+                          <p className="break-words">
                             <strong className="text-cyber-text">最后检查:</strong> {new Date(task.last_check).toLocaleString('zh-CN')}
                           </p>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-2 ml-4">
+                    <div className="flex flex-col gap-2 flex-shrink-0 min-w-[80px]">
                       {task.match_status !== 'completed' && (
                         <>
                           <button
                             onClick={() => handleToggleTask(task.id)}
-                            className={`px-3 py-1 rounded flex items-center gap-1 text-sm transition-all ${
+                            className={`px-2 sm:px-3 py-1 rounded flex items-center justify-center gap-1 text-xs sm:text-sm transition-all whitespace-nowrap ${
                               task.enabled
                                 ? 'bg-yellow-400/10 text-yellow-400 border border-yellow-400/30 hover:bg-yellow-400/20'
                                 : 'bg-green-400/10 text-green-400 border border-green-400/30 hover:bg-green-400/20'
                             }`}
                           >
-                            {task.enabled ? <Pause size={14} /> : <Play size={14} />}
-                            {task.enabled ? '暂停' : '启动'}
+                            {task.enabled ? <Pause size={isMobile ? 12 : 14} /> : <Play size={isMobile ? 12 : 14} />}
+                            <span className="hidden sm:inline">{task.enabled ? '暂停' : '启动'}</span>
                           </button>
                           
                           <button
                             onClick={() => handleCheckTask(task.id)}
-                            className="px-3 py-1 bg-cyber-accent/10 text-cyber-accent border border-cyber-accent/30 rounded hover:bg-cyber-accent/20 flex items-center gap-1 text-sm transition-all"
+                            className="px-2 sm:px-3 py-1 bg-cyber-accent/10 text-cyber-accent border border-cyber-accent/30 rounded hover:bg-cyber-accent/20 flex items-center justify-center gap-1 text-xs sm:text-sm transition-all whitespace-nowrap"
                           >
-                            <RefreshCw size={14} />
-                            立即检查
+                            <RefreshCw size={isMobile ? 12 : 14} />
+                            <span className="hidden sm:inline">检查</span>
                           </button>
                         </>
                       )}
                       
                       <button
                         onClick={() => handleDeleteTask(task.id)}
-                        className="px-3 py-1 bg-red-500/10 text-red-400 border border-red-500/30 rounded hover:bg-red-500/20 flex items-center gap-1 text-sm transition-all"
+                        className="px-2 sm:px-3 py-1 bg-red-500/10 text-red-400 border border-red-500/30 rounded hover:bg-red-500/20 flex items-center justify-center gap-1 text-xs sm:text-sm transition-all whitespace-nowrap"
                       >
-                        <Trash2 size={14} />
-                        删除
+                        <Trash2 size={isMobile ? 12 : 14} />
+                        <span className="hidden sm:inline">删除</span>
                       </button>
                     </div>
                   </div>

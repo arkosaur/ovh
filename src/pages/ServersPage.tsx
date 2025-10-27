@@ -51,13 +51,32 @@ const globalStyles = `
 .animate-pulse-slow {
   animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
-/* 防止Via浏览器等轻量浏览器中的闪烁 */
+/* 防止Via浏览器等轻量浏览器中的闪烁 - 增强版 */
 .datacenter-item {
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* 使用contain来隔离渲染，防止影响其他元素 */
+  contain: layout style paint;
+  /* 禁用touch-action的默认行为，减少浏览器干预 */
+  touch-action: manipulation;
+  /* 强制使用硬件加速 */
+  -webkit-perspective: 1000;
+  perspective: 1000;
+  /* 防止文本选择干扰点击 */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  /* 优化重绘性能 */
+  will-change: auto;
+}
+/* Via浏览器触摸反馈优化 */
+.datacenter-item:active {
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
 }
 `;
 
@@ -754,8 +773,15 @@ const ServersPage = () => {
     }
   };
 
-  // 切换特定服务器的数据中心选择状态
+  // 切换特定服务器的数据中心选择状态（带防抖优化）
+  const toggleDatacenterSelectionRef = useRef<{ timeout: NodeJS.Timeout | null }>({ timeout: null });
   const toggleDatacenterSelection = (serverPlanCode: string, datacenter: string) => {
+    // 清除之前的防抖定时器
+    if (toggleDatacenterSelectionRef.current.timeout) {
+      clearTimeout(toggleDatacenterSelectionRef.current.timeout);
+    }
+    
+    // 立即更新UI状态（无延迟）
     setSelectedDatacenters(prev => ({
       ...prev,
       [serverPlanCode]: {
@@ -763,6 +789,11 @@ const ServersPage = () => {
         [datacenter]: !prev[serverPlanCode]?.[datacenter]
       }
     }));
+    
+    // 设置新的防抖定时器，用于后续可能的操作
+    toggleDatacenterSelectionRef.current.timeout = setTimeout(() => {
+      toggleDatacenterSelectionRef.current.timeout = null;
+    }, 100);
   };
 
   // 全选或取消全选特定服务器的所有数据中心
@@ -1549,28 +1580,28 @@ const ServersPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-x-hidden">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <h1 className="text-3xl font-bold mb-1 cyber-glow-text">服务器列表</h1>
-        <p className="text-cyber-muted mb-6">浏览可用服务器与实时可用性检测</p>
+        <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold mb-1 cyber-glow-text`}>服务器列表</h1>
+        <p className="text-cyber-muted mb-4 sm:mb-6 text-xs sm:text-sm">浏览可用服务器与实时可用性检测</p>
       </motion.div>
       
       {/* 添加全局样式 */}
       <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
 
       {/* 添加可用性检测说明 */}
-      <div className="bg-cyber-accent/15 border border-cyber-accent/50 rounded-md p-3 mb-4 shadow-md shadow-cyber-accent/10">
+      <div className="bg-cyber-accent/15 border border-cyber-accent/50 rounded-md p-2 sm:p-3 mb-3 sm:mb-4 shadow-md shadow-cyber-accent/10 overflow-hidden">
         <div className="flex items-start">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-accent mt-0.5 mr-2 flex-shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 16 : 18} height={isMobile ? 16 : 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-accent mt-0.5 mr-2 flex-shrink-0">
             <circle cx="12" cy="12" r="10"></circle>
             <line x1="12" y1="16" x2="12" y2="12"></line>
             <line x1="12" y1="8" x2="12.01" y2="8"></line>
           </svg>
-          <p className="text-sm text-slate-100">
+          <p className="text-xs sm:text-sm text-slate-100 break-words min-w-0">
             <span className="text-cyber-accent font-medium">可用性检测说明：</span> 
             可用性检测已校准！缺省配置与可选配置均可准确检测可用性！
           </p>
@@ -1578,29 +1609,29 @@ const ServersPage = () => {
       </div>
 
       {/* Filters and controls */}
-      <div className="cyber-panel p-4 mb-6">
-        <div className="flex items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
+      <div className="cyber-panel p-3 sm:p-4 mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="relative flex-1 sm:max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-muted">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-muted">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
             </div>
             <input
               type="text"
-              placeholder="搜索服务器..."
+              placeholder={isMobile ? "搜索..." : "搜索服务器..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="cyber-input pl-10 w-full"
+              className="cyber-input pl-9 sm:pl-10 w-full text-sm"
             />
           </div>
           
-          <div className="flex items-center justify-end space-x-4">
-            <div className="flex items-center">
-              <Clock size={16} className="text-cyber-muted mr-1.5" />
-              <span className="text-xs text-cyber-muted mr-3">
-                更新于: {formatDateTime(lastUpdated)}
+          <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4">
+            <div className="flex items-center flex-shrink-0">
+              <Clock size={14} className="text-cyber-muted mr-1 sm:mr-1.5" />
+              <span className="text-[10px] sm:text-xs text-cyber-muted whitespace-nowrap">
+                {isMobile ? formatDateTime(lastUpdated).split(' ')[1] : `更新于: ${formatDateTime(lastUpdated)}`}
               </span>
             </div>
             
@@ -1636,7 +1667,7 @@ const ServersPage = () => {
             {!isMobile && (
               <button
                 onClick={() => setDisplayMode(displayMode === 'compact' ? 'detailed' : 'compact')}
-                className="p-2 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded-md transition-all"
+                className="p-1.5 sm:p-2 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded-md transition-all flex-shrink-0"
                 title={displayMode === 'compact' ? '切换到详细模式' : '切换到紧凑模式'}
               >
                 {displayMode === 'compact' ? <Maximize2 size={16} /> : <Minimize2 size={16} />}
@@ -1646,14 +1677,14 @@ const ServersPage = () => {
             <button
               onClick={() => fetchServers(true)}
               disabled={isLoading}
-              className="px-4 py-2 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded-md transition-all text-sm font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded-md transition-all text-xs sm:text-sm font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 sm:gap-2 flex-shrink-0 whitespace-nowrap"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={isLoading ? 'animate-spin' : ''}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${isLoading ? 'animate-spin' : ''} sm:w-4 sm:h-4`}>
                 <polyline points="1 4 1 10 7 10"></polyline>
                 <polyline points="23 20 23 14 17 14"></polyline>
                 <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
               </svg>
-              刷新
+              <span className="hidden sm:inline">刷新</span>
             </button>
           </div>
         </div>
@@ -1706,10 +1737,10 @@ const ServersPage = () => {
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className={`grid gap-6 ${
+            className={`grid gap-4 sm:gap-6 ${
               displayMode === 'compact'
-                ? 'grid-cols-1 md:grid-cols-3 xl:grid-cols-4'
-                : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
+                ? 'grid-cols-1 lg:grid-cols-3 xl:grid-cols-4'
+                : 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3'
             }`}
           >
             {filteredServers.map((server) => (
@@ -1719,26 +1750,26 @@ const ServersPage = () => {
             >
               <Card className="border-cyber-accent/30 overflow-hidden h-full">
                 {/* Header with server code and name */}
-                <CardHeader className="px-3 py-2 bg-cyber-grid/20 border-b border-cyber-accent/20">
-                  <div className="flex justify-between items-center">
-                    <CardTitle className="text-base font-semibold">{server.planCode}</CardTitle>
-                    <div className="flex items-center gap-2">
-                      <div className="bg-cyber-accent/10 px-1.5 py-0.5 rounded text-[10px] border border-cyber-accent/20 text-cyber-accent">
+                <CardHeader className="px-2 sm:px-3 py-2 bg-cyber-grid/20 border-b border-cyber-accent/20">
+                  <div className="flex justify-between items-center gap-2 min-w-0">
+                    <CardTitle className="text-sm sm:text-base font-semibold truncate flex-shrink-0 max-w-[40%]">{server.planCode}</CardTitle>
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink min-w-0">
+                      <div className="bg-cyber-accent/10 px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] border border-cyber-accent/20 text-cyber-accent truncate max-w-[120px]">
                         {server.name}
                       </div>
                       {subscribedServers.has(server.planCode) && (
-                        <span className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-400 hover:to-blue-500 hover:-translate-y-0.5 transition-all duration-200" title="已订阅监控">
-                          <Bell size={12} />
-                          <span className="tracking-wide">已订阅</span>
+                        <span className="relative flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-400 hover:to-blue-500 hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap flex-shrink-0" title="已订阅监控">
+                          <Bell size={isMobile ? 10 : 12} />
+                          <span className="tracking-wide hidden sm:inline">已订阅</span>
                         </span>
                       )}
                     </div>
                   </div>
                 </CardHeader>
                 
-                <CardContent className="p-3">
+                <CardContent className="p-2 sm:p-3">
                   {/* Server specs in a grid */}
-                  <div className="grid grid-cols-2 gap-1.5 mb-3">
+                  <div className="grid grid-cols-2 gap-1.5 mb-2 sm:mb-3">
                     <div className="flex items-center space-x-1.5 p-1.5 bg-cyber-grid/10 rounded border border-cyber-accent/10">
                       <Cpu size={14} className="text-cyber-accent flex-shrink-0" />
                       <div className="min-w-0">
@@ -1782,39 +1813,40 @@ const ServersPage = () => {
                   {renderServerOptions(server)}
                   
                   {/* Datacenters availability section - REINSTATED */}
-                  <div className="mt-4 rounded-md overflow-hidden border border-cyber-accent/30">
-                    <div className="flex justify-between items-center bg-cyber-grid/30 px-3 py-2 border-b border-cyber-accent/30">
-                      <span className="text-xs font-medium flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-accent mr-2">
+                  <div className="mt-3 sm:mt-4 rounded-md overflow-hidden border border-cyber-accent/30">
+                    <div className="flex justify-between items-center bg-cyber-grid/30 px-2 sm:px-3 py-1.5 sm:py-2 border-b border-cyber-accent/30">
+                      <span className="text-[10px] sm:text-xs font-medium flex items-center flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 14 : 18} height={isMobile ? 14 : 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-accent mr-1 sm:mr-2">
                           <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
                           <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
                           <line x1="6" y1="6" x2="6.01" y2="6"></line>
                           <line x1="6" y1="18" x2="6.01" y2="18"></line>
                         </svg>
-                        数据中心选择
+                        <span className="hidden sm:inline">数据中心选择</span>
+                        <span className="sm:hidden">机房</span>
                       </span>
-                      <div className="flex gap-2 items-center">
-                        <div className="flex gap-1.5">
+                      <div className="flex gap-1 sm:gap-2 items-center min-w-0 flex-shrink">
+                        <div className="flex gap-1 sm:gap-1.5">
                           <button
                             onClick={() => checkAvailability(server.planCode)}
                             disabled={isCheckingAvailability || !isAuthenticated}
-                            className="px-2 py-1 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded-md transition-all text-[10px] font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                            className="px-1.5 sm:px-2 py-1 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded-md transition-all text-[9px] sm:text-[10px] font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-0.5 sm:gap-1 whitespace-nowrap flex-shrink-0"
                           >
                             {isCheckingAvailability && selectedServer === server.planCode ? (
                               <>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-pulse">
+                                <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 9 : 10} height={isMobile ? 9 : 10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-pulse flex-shrink-0">
                                   <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                                 </svg>
-                                查询中
+                                <span className="hidden sm:inline">查询中</span>
                               </>
                             ) : (
                               <>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 9 : 10} height={isMobile ? 9 : 10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                                   <circle cx="12" cy="12" r="10"></circle>
                                   <line x1="12" y1="16" x2="12" y2="12"></line>
                                   <line x1="12" y1="8" x2="12.01" y2="8"></line>
                                 </svg>
-                                检查
+                                <span className="hidden sm:inline">检查</span>
                               </>
                             )}
                           </button>
@@ -1824,11 +1856,11 @@ const ServersPage = () => {
                               addToMonitor(server, selectedDcs);
                             }}
                             disabled={!isAuthenticated}
-                            className="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/40 hover:border-blue-500/60 rounded-md transition-all text-[10px] font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                            className="px-1.5 sm:px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/40 hover:border-blue-500/60 rounded-md transition-all text-[9px] sm:text-[10px] font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-0.5 sm:gap-1 whitespace-nowrap flex-shrink-0"
                             title="添加到服务器监控"
                           >
-                            <Bell size={10} />
-                            监控
+                            <Bell size={isMobile ? 9 : 10} className="flex-shrink-0" />
+                            <span className="hidden sm:inline">监控</span>
                           </button>
                         </div>
                         <button
@@ -1841,15 +1873,16 @@ const ServersPage = () => {
                             }
                           }}
                           disabled={!isAuthenticated || getSelectedDatacentersList(server.planCode).length === 0}
-                          className="relative px-5 py-2 bg-gradient-to-r from-cyber-primary to-cyber-primary-dark hover:from-cyber-primary-dark hover:to-cyber-primary text-white border-2 border-cyber-primary/40 hover:border-cyber-primary rounded-md transition-all text-xs font-bold shadow-lg hover:shadow-xl hover:shadow-cyber-primary/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center gap-1.5 animate-pulse-slow"
+                          className="relative px-3 sm:px-5 py-1.5 sm:py-2 bg-gradient-to-r from-cyber-primary to-cyber-primary-dark hover:from-cyber-primary-dark hover:to-cyber-primary text-white border-2 border-cyber-primary/40 hover:border-cyber-primary rounded-md transition-all text-[10px] sm:text-xs font-bold shadow-lg hover:shadow-xl hover:shadow-cyber-primary/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center gap-1 sm:gap-1.5 animate-pulse-slow whitespace-nowrap flex-shrink-0"
                           style={{ animationDuration: '2s' }}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 12 : 14} height={isMobile ? 12 : 14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                             <circle cx="9" cy="21" r="1"></circle>
                             <circle cx="20" cy="21" r="1"></circle>
                             <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
                           </svg>
-                          <span className="tracking-wide">一键抢购</span>
+                          <span className="tracking-wide hidden sm:inline">一键抢购</span>
+                          <span className="sm:hidden">抢购</span>
                           <span className="absolute -top-1 -right-1 flex h-3 w-3">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyber-accent opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-3 w-3 bg-cyber-primary"></span>
@@ -1858,35 +1891,37 @@ const ServersPage = () => {
                       </div>
                     </div>
                     
-                    <div className="p-2 bg-cyber-grid/10 border-b border-cyber-accent/20">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-cyber-muted flex items-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+                    <div className="p-1.5 sm:p-2 bg-cyber-grid/10 border-b border-cyber-accent/20">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[9px] sm:text-[10px] text-cyber-muted flex items-center flex-shrink-0">
+                          <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 10 : 12} height={isMobile ? 10 : 12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 flex-shrink-0">
                             <circle cx="12" cy="12" r="10"></circle>
                             <path d="M12 8v4l3 3"></path>
                           </svg>
-                          选择部署位置:
+                          <span className="hidden sm:inline">选择部署位置:</span>
+                          <span className="sm:hidden">位置:</span>
                         </span>
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-1 sm:gap-1.5">
                           <button
                             onClick={() => toggleAllDatacenters(server.planCode, true)}
-                            className="px-2 py-1 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded text-[10px] font-medium transition-all shadow-sm hover:shadow-md"
+                            className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded text-[9px] sm:text-[10px] font-medium transition-all shadow-sm hover:shadow-md whitespace-nowrap"
                           >
                             全选
                           </button>
                           <button
                             onClick={() => toggleAllDatacenters(server.planCode, false)}
-                            className="px-2 py-1 bg-cyber-grid/10 hover:bg-cyber-grid/20 text-cyber-muted hover:text-cyber-text border border-cyber-accent/20 hover:border-cyber-accent/40 rounded text-[10px] font-medium transition-all shadow-sm hover:shadow-md"
+                            className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-cyber-grid/10 hover:bg-cyber-grid/20 text-cyber-muted hover:text-cyber-text border border-cyber-accent/20 hover:border-cyber-accent/40 rounded text-[9px] sm:text-[10px] font-medium transition-all shadow-sm hover:shadow-md whitespace-nowrap"
                           >
-                            取消全选
+                            <span className="hidden sm:inline">取消全选</span>
+                            <span className="sm:hidden">取消</span>
                           </button>
                         </div>
                       </div>
                     </div>
                     
                     {/* 数据中心列表 - 采用用户截图样式，一行1-2列 */}
-                    <div className="bg-slate-900/10 p-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="bg-slate-900/10 p-1.5 sm:p-2 overflow-hidden">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
                         {OVH_DATACENTERS
                           .filter(dc => {
                             // 如果服务器代码包含特定数据中心后缀，只显示对应的数据中心
@@ -1933,38 +1968,43 @@ const ServersPage = () => {
                                             : 'bg-slate-800/60 border-slate-700 hover:bg-slate-700/60 hover:border-slate-500'}
                                          `}
                               style={{ 
-                                transition: 'background-color 200ms ease-out, border-color 200ms ease-out, box-shadow 200ms ease-out',
-                                willChange: 'background-color, border-color'
+                                transition: 'background-color 150ms linear, border-color 150ms linear, box-shadow 150ms linear'
                               }}
                                   onClick={() => toggleDatacenterSelection(server.planCode, dcCode)}
                               title={`${dc.name} (${dc.region}) - ${statusText}`}
                             >
                               <div className="flex items-center overflow-hidden mr-1.5 min-w-0">
-                                <span className={`fi fi-${dc.countryCode.toLowerCase()} mr-1.5 text-sm flex-shrink-0`}></span>
-                                <div className="flex flex-col overflow-hidden min-w-0">
-                                  <span className={`text-xs font-semibold truncate ${isSelected ? 'text-cyber-accent' : 'text-slate-100'}`}>{dcCode}</span>
-                                  <span className={`text-[9px] mt-0.5 truncate ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>{dc.name}</span>
+                                <span className={`fi fi-${dc.countryCode.toLowerCase()} mr-1.5 text-sm flex-shrink-0`} style={{ width: '16px', height: '16px', display: 'inline-block' }}></span>
+                                <div className="flex flex-col overflow-hidden min-w-0" style={{ minWidth: '60px' }}>
+                                  <span className={`text-xs font-semibold truncate ${isSelected ? 'text-cyber-accent' : 'text-slate-100'}`} style={{ transition: 'color 150ms linear' }}>{dcCode}</span>
+                                  <span className={`text-[9px] mt-0.5 truncate ${isSelected ? 'text-slate-300' : 'text-slate-400'}`} style={{ transition: 'color 150ms linear' }}>{dc.name}</span>
                                 </div>
                               </div>
-                              <span className={`text-[10px] font-medium ${statusColorClass} flex items-center flex-shrink-0 min-w-[40px] justify-end`}>
+                              <span className={`text-[10px] font-medium ${statusColorClass} flex items-center flex-shrink-0 min-w-[40px] justify-end`} style={{ transition: 'color 150ms linear' }}>
                                 {availStatus === "unknown" ? (
-                                  <span className="inline-block" style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <span className="inline-block" style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite', display: 'inline-flex' }}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
                                       <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                                     </svg>
                                   </span>
                                 ) : (
-                                  <span className="inline-block">{statusText}</span>
+                                  <span className="inline-block" style={{ display: 'inline-block', minWidth: '32px', textAlign: 'right' }}>{statusText}</span>
                                     )}
                               </span>
                                   
-                                  {isSelected && (
-                                <div className="absolute top-1 right-1 w-4 h-4 bg-cyber-accent rounded-full flex items-center justify-center">
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="20 6 9 17 4 12"></polyline>
-                                      </svg>
-                                    </div>
-                                  )}
+                                  <div 
+                                    className="absolute top-1 right-1 w-4 h-4 bg-cyber-accent rounded-full flex items-center justify-center"
+                                    style={{ 
+                                      opacity: isSelected ? 1 : 0,
+                                      transform: isSelected ? 'scale(1)' : 'scale(0.5)',
+                                      transition: 'opacity 150ms linear, transform 150ms linear',
+                                      pointerEvents: 'none'
+                                    }}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+                                      <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                  </div>
                                 </div>
                               );
                             })}
