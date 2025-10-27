@@ -93,7 +93,7 @@ const Dashboard = () => {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
       >
         {/* 活跃队列 */}
         <motion.div variants={itemVariants} className="cyber-card relative overflow-hidden">

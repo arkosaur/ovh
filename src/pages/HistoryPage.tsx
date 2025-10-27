@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { api } from "@/utils/apiClient";
 import { toast } from "sonner";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PurchaseHistory {
   id: string;
@@ -16,6 +17,7 @@ interface PurchaseHistory {
 }
 
 const HistoryPage = () => {
+  const isMobile = useIsMobile();
   const [history, setHistory] = useState<PurchaseHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<"all" | "success" | "failed">("all");
@@ -173,7 +175,66 @@ const HistoryPage = () => {
             </svg>
             <p className="text-cyber-muted">没有找到购买历史记录</p>
           </div>
+        ) : isMobile ? (
+          /* 移动端：卡片布局 */
+          <div className="p-2 space-y-3">
+            {filteredHistory.map((item) => (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-cyber-grid/10 rounded-lg border border-cyber-accent/20 space-y-2"
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-medium text-cyber-accent text-sm">{item.planCode}</div>
+                    <div className="text-xs text-cyber-text-dimmed mt-1">
+                      {item.datacenter.toUpperCase()} · {new Date(item.purchaseTime).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                    item.status === "success" 
+                      ? "bg-green-500/20 text-green-400" 
+                      : "bg-red-500/20 text-red-400"
+                  }`}>
+                    {item.status === "success" ? "成功" : "失败"}
+                  </span>
+                </div>
+                
+                {item.options && item.options.length > 0 && (
+                  <div className="text-xs text-cyber-text-dimmed pt-2 border-t border-cyber-grid/30">
+                    <span className="text-cyber-muted">配置：</span> {item.options.join(', ')}
+                  </div>
+                )}
+                
+                {item.orderId && (
+                  <div className="text-xs text-cyber-text-dimmed">
+                    <span className="text-cyber-muted">订单ID：</span> {item.orderId}
+                  </div>
+                )}
+                
+                {item.status === "success" && item.orderUrl ? (
+                  <a 
+                    href={item.orderUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-block mt-2 px-3 py-1 text-xs text-cyber-accent border border-cyber-accent/30 rounded hover:bg-cyber-accent/10 transition-colors"
+                  >
+                    查看订单
+                  </a>
+                ) : item.status === "failed" && item.errorMessage ? (
+                  <button
+                    onClick={() => toast.info(item.errorMessage)}
+                    className="inline-block mt-2 px-3 py-1 text-xs text-red-400 border border-red-400/30 rounded hover:bg-red-400/10 transition-colors"
+                  >
+                    查看错误
+                  </button>
+                ) : null}
+              </motion.div>
+            ))}
+          </div>
         ) : (
+          /* 桌面端：表格布局 */
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>

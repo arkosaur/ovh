@@ -15,6 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Cpu, Database, Wifi, HardDrive, CheckSquare, Square, Settings, ArrowRightLeft, Clock, Bell, Grid, List, Maximize2, Minimize2 } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { apiEvents } from "@/context/APIContext";
 import { OVH_DATACENTERS, DatacenterInfo } from "@/config/ovhConstants"; // Import from new location
 import { API_URL } from "@/config/constants";
@@ -80,6 +81,7 @@ interface ServerPlan {
 }
 
 const ServersPage = () => {
+  const isMobile = useIsMobile();
   const { isAuthenticated } = useAPI();
   const [servers, setServers] = useState<ServerPlan[]>([]);
   const [filteredServers, setFilteredServers] = useState<ServerPlan[]>([]);
@@ -105,6 +107,13 @@ const ServersPage = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   // 显示模式：compact 或 detailed
   const [displayMode, setDisplayMode] = useState<'compact' | 'detailed'>('detailed');
+  
+  // 移动端强制使用网格视图
+  useEffect(() => {
+    if (isMobile && viewMode === 'list') {
+      setViewMode('grid');
+    }
+  }, [isMobile, viewMode]);
   // 已订阅的服务器列表（planCode）
   // 从localStorage初始化，避免页面加载时丢失订阅状态
   const [subscribedServers, setSubscribedServers] = useState<Set<string>>(() => {
@@ -1564,31 +1573,33 @@ const ServersPage = () => {
               </span>
             </div>
             
-            {/* 视图切换按钮组 */}
-            <div className="flex items-center gap-2 border border-cyber-accent/30 rounded-md p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded transition-all ${
-                  viewMode === 'grid' 
-                    ? 'bg-cyber-accent/20 text-cyber-accent' 
-                    : 'text-cyber-muted hover:text-cyber-text hover:bg-cyber-grid/10'
-                }`}
-                title="网格视图"
-              >
-                <Grid size={16} />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded transition-all ${
-                  viewMode === 'list' 
-                    ? 'bg-cyber-accent/20 text-cyber-accent' 
-                    : 'text-cyber-muted hover:text-cyber-text hover:bg-cyber-grid/10'
-                }`}
-                title="列表视图"
-              >
-                <List size={16} />
-              </button>
-            </div>
+            {/* 视图切换按钮组 - 移动端隐藏 */}
+            {!isMobile && (
+              <div className="flex items-center gap-2 border border-cyber-accent/30 rounded-md p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded transition-all ${
+                    viewMode === 'grid' 
+                      ? 'bg-cyber-accent/20 text-cyber-accent' 
+                      : 'text-cyber-muted hover:text-cyber-text hover:bg-cyber-grid/10'
+                  }`}
+                  title="网格视图"
+                >
+                  <Grid size={16} />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-1.5 rounded transition-all ${
+                    viewMode === 'list' 
+                      ? 'bg-cyber-accent/20 text-cyber-accent' 
+                      : 'text-cyber-muted hover:text-cyber-text hover:bg-cyber-grid/10'
+                  }`}
+                  title="列表视图"
+                >
+                  <List size={16} />
+                </button>
+              </div>
+            )}
 
             {/* 紧凑模式切换 */}
             <button
@@ -1617,7 +1628,7 @@ const ServersPage = () => {
 
       {/* Loading state */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="animate-pulse border-cyber-accent/30">
               <CardHeader className="bg-cyber-grid/10">

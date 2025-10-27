@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Target, Search, CheckCircle, Clock, Plus, AlertCircle, Play, Pause, Trash2, RefreshCw } from 'lucide-react';
 import apiClient from '../utils/apiClient';
 import { useToast } from '../components/ToastContainer';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface ConfigOption {
   memory: {
@@ -35,6 +36,7 @@ interface ConfigSniperTask {
 }
 
 const ConfigSniperPage: React.FC = () => {
+  const isMobile = useIsMobile();
   const { showToast, showConfirm } = useToast();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [planCode, setPlanCode] = useState('');
@@ -246,22 +248,22 @@ const ConfigSniperPage: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-cyber-accent/10 rounded-lg border border-cyber-accent/30">
-              <Target className="text-cyber-accent" size={24} />
+              <Target className="text-cyber-accent" size={isMobile ? 20 : 24} />
             </div>
             <div>
-              <h1 className="text-3xl font-bold cyber-glow-text">配置绑定狙击</h1>
-              <p className="text-cyber-muted text-sm">输入型号→选择配置→匹配 API2→监控可用性→自动下单</p>
+              <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold cyber-glow-text`}>配置绑定狙击</h1>
+              <p className="text-cyber-muted text-xs sm:text-sm">输入型号→选择配置→匹配 API2→监控可用性→自动下单</p>
             </div>
           </div>
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
-            className="px-4 py-2 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 flex items-center gap-2 transition-all shadow-neon-sm"
+            className="px-4 py-2 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 flex items-center justify-center gap-2 transition-all shadow-neon-sm text-sm"
           >
             <Plus size={18} />
-            {showCreateForm ? '隐藏创建表单' : '新建任务'}
+            {showCreateForm ? '隐藏' : '新建任务'}
           </button>
         </div>
       </motion.div>
@@ -273,21 +275,21 @@ const ConfigSniperPage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="cyber-card"
         >
-          <h2 className="text-xl font-semibold mb-4 text-cyber-text">步骤 1: 输入型号代码</h2>
-          <div className="flex gap-4">
+          <h2 className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold mb-4 text-cyber-text`}>步骤 1: 输入型号代码</h2>
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <input
               type="text"
               value={planCode}
               onChange={(e) => setPlanCode(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleQueryPlanCode()}
-              placeholder="输入 API1 型号（如 24ska01、26sklea01-v1）"
-              className="flex-1 px-4 py-3 bg-cyber-grid/50 border border-cyber-accent/30 rounded-lg focus:ring-2 focus:ring-cyber-accent focus:border-cyber-accent text-cyber-text placeholder-cyber-muted"
+              placeholder="输入 API1 型号（如 24ska01）"
+              className="flex-1 px-4 py-3 bg-cyber-grid/50 border border-cyber-accent/30 rounded-lg focus:ring-2 focus:ring-cyber-accent focus:border-cyber-accent text-cyber-text placeholder-cyber-muted text-sm"
               disabled={loading}
             />
             <button
               onClick={handleQueryPlanCode}
               disabled={loading || !planCode.trim()}
-              className="px-6 py-3 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 disabled:bg-cyber-grid disabled:text-cyber-muted disabled:cursor-not-allowed flex items-center gap-2 transition-all shadow-neon-sm"
+              className="px-6 py-3 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 disabled:bg-cyber-grid disabled:text-cyber-muted disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all shadow-neon-sm whitespace-nowrap text-sm"
             >
               <Search size={18} />
               {loading ? '查询中...' : '查询配置'}
@@ -399,33 +401,33 @@ const ConfigSniperPage: React.FC = () => {
 
           <div className="mt-6 flex flex-col gap-4">
             <div className="p-4 bg-cyber-grid/30 border border-cyber-accent/30 rounded-lg">
-              <p className="text-cyber-text font-semibold mb-3">选择监控模式：</p>
-              <div className="flex gap-4">
+              <p className="text-cyber-text font-semibold mb-3 text-sm sm:text-base">选择监控模式：</p>
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <button
                   onClick={() => handleCreateTask('matched')}
                   disabled={!selectedConfig || loading || selectedConfig.match_count === 0}
-                  className="flex-1 px-6 py-4 bg-green-500/20 border-2 border-green-500/50 text-green-400 rounded-lg hover:bg-green-500/30 hover:border-green-500 disabled:bg-cyber-grid disabled:text-cyber-muted disabled:border-cyber-grid disabled:cursor-not-allowed flex flex-col items-center gap-2 transition-all shadow-neon-sm"
+                  className="flex-1 px-4 sm:px-6 py-3 sm:py-4 bg-green-500/20 border-2 border-green-500/50 text-green-400 rounded-lg hover:bg-green-500/30 hover:border-green-500 disabled:bg-cyber-grid disabled:text-cyber-muted disabled:border-cyber-grid disabled:cursor-not-allowed flex flex-col items-center gap-2 transition-all shadow-neon-sm"
                 >
                   <div className="flex items-center gap-2">
-                    <CheckCircle size={18} />
-                    <span className="font-bold">{loading ? '创建中...' : '已匹配模式'}</span>
+                    <CheckCircle size={16} />
+                    <span className="font-bold text-sm">{loading ? '创建中...' : '已匹配模式'}</span>
                   </div>
                   <span className="text-xs text-center">
-                    监控 {selectedConfig?.match_count || 0} 个已知型号，有货立即下单
+                    监控 {selectedConfig?.match_count || 0} 个型号
                   </span>
                 </button>
                 
                 <button
                   onClick={() => handleCreateTask('pending_match')}
                   disabled={!selectedConfig || loading}
-                  className="flex-1 px-6 py-4 bg-yellow-500/20 border-2 border-yellow-500/50 text-yellow-400 rounded-lg hover:bg-yellow-500/30 hover:border-yellow-500 disabled:bg-cyber-grid disabled:text-cyber-muted disabled:border-cyber-grid disabled:cursor-not-allowed flex flex-col items-center gap-2 transition-all shadow-neon-sm"
+                  className="flex-1 px-4 sm:px-6 py-3 sm:py-4 bg-yellow-500/20 border-2 border-yellow-500/50 text-yellow-400 rounded-lg hover:bg-yellow-500/30 hover:border-yellow-500 disabled:bg-cyber-grid disabled:text-cyber-muted disabled:border-cyber-grid disabled:cursor-not-allowed flex flex-col items-center gap-2 transition-all shadow-neon-sm"
                 >
                   <div className="flex items-center gap-2">
-                    <Clock size={18} />
-                    <span className="font-bold">{loading ? '创建中...' : '未匹配模式'}</span>
+                    <Clock size={16} />
+                    <span className="font-bold text-sm">{loading ? '创建中...' : '未匹配模式'}</span>
                   </div>
                   <span className="text-xs text-center">
-                    排除 {selectedConfig?.match_count || 0} 个已知型号，等待新增型号
+                    等待新增型号
                   </span>
                 </button>
               </div>
