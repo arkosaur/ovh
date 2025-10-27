@@ -282,8 +282,10 @@ const SettingsPage = () => {
                       <option value="LT">立陶宛 (LT)</option>
                       <option value="CZ">捷克 (CZ)</option>
                       <option value="NL">荷兰 (NL)</option>
+                      <option value="CA">加拿大 (CA)</option>
+                      <option value="US">美国 (US)</option>
                     </select>
-                    <p className="text-xs text-cyber-muted mt-1">默认: IE</p>
+                    <p className="text-xs text-cyber-muted mt-1">默认: IE (欧洲区), CA (加拿大), US (美国)</p>
                   </div>
                   
                   <div>
@@ -424,10 +426,24 @@ const SettingsPage = () => {
                       </svg>
                       CA区域 (加拿大)
                     </a>
+                    
+                    <a 
+                      href="https://us.api.ovh.com/createToken/" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="cyber-button text-xs w-full inline-flex items-center justify-center"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                        <polyline points="15 3 21 3 21 9"></polyline>
+                        <line x1="10" y1="14" x2="21" y2="3"></line>
+                      </svg>
+                      US区域 (美国)
+                    </a>
                   </div>
                   
                   <p className="text-xs text-cyan-400 mt-3">
-                    💡 提示：大部分用户使用EU区域
+                    💡 提示：根据您的服务器所在区域选择对应的API
                   </p>
                 </div>
                 

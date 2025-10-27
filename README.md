@@ -236,6 +236,11 @@ export const API_URL = 'http://123.45.67.89:5000/api';
      - **Application Secret** (AS)
      - **Consumer Key** (CK)
 
+**注意：** 请根据您的目标区域选择对应的API控制台：
+- 欧洲区域用户 → https://eu.api.ovh.com/createToken/
+- 加拿大区域用户 → https://ca.api.ovh.com/createToken/
+- 美国区域用户 → https://us.api.ovh.com/createToken/
+
 ### 配置方式
 
 **方式1：通过Web界面配置（推荐）**
@@ -247,9 +252,17 @@ export const API_URL = 'http://123.45.67.89:5000/api';
    Application Key: 你的AK
    Application Secret: 你的AS
    Consumer Key: 你的CK
-   Endpoint: ovh-eu (欧洲) 或 ovh-ca (加拿大)
+   Endpoint: ovh-eu (欧洲) / ovh-ca (加拿大) / ovh-us (美国)
+   Zone: IE/FR/GB... (欧洲) / CA (加拿大) / US (美国)
    ```
 4. 点击"保存设置"
+
+**区域配置说明：**
+| Endpoint | Zone | IAM | 说明 |
+|----------|------|-----|------|
+| ovh-eu | IE, FR, GB, DE, ES, PT, IT, PL, FI, LT, CZ, NL | go-ovh-{zone} | 欧洲区域 |
+| ovh-ca | CA | go-ovh-ca | 加拿大区域 |
+| ovh-us | US | go-ovh-us | 美国区域 |
 
 **方式2：直接修改配置文件**
 
