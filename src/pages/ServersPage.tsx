@@ -790,27 +790,51 @@ const ServersPage = () => {
     }
   };
 
-  // 切换特定服务器的数据中心选择状态（带防抖优化）
-  const toggleDatacenterSelectionRef = useRef<{ timeout: NodeJS.Timeout | null }>({ timeout: null });
-  const toggleDatacenterSelection = (serverPlanCode: string, datacenter: string) => {
-    // 清除之前的防抖定时器
-    if (toggleDatacenterSelectionRef.current.timeout) {
-      clearTimeout(toggleDatacenterSelectionRef.current.timeout);
+  // 切换特定服务器的数据中心选择状态（优化版 - 使用原生DOM避免React重渲染闪烁）
+  const toggleDatacenterSelection = (serverPlanCode: string, datacenter: string, event?: React.MouseEvent<HTMLDivElement>) => {
+    // 立即通过原生DOM更新UI（避免React重渲染）
+    if (event?.currentTarget) {
+      const element = event.currentTarget;
+      const isCurrentlySelected = selectedDatacenters[serverPlanCode]?.[datacenter];
+      const newIsSelected = !isCurrentlySelected;
+      
+      // 立即更新DOM样式（无延迟，无重渲染）
+      if (newIsSelected) {
+        element.style.backgroundColor = 'rgba(100, 255, 218, 0.2)';
+        element.style.borderColor = 'rgb(100, 255, 218)';
+      } else {
+        element.style.backgroundColor = 'rgba(30, 41, 59, 0.6)';
+        element.style.borderColor = 'rgb(51, 65, 85)';
+      }
+      
+      // 更新文字颜色
+      const codeSpan = element.querySelector('.dc-code') as HTMLElement;
+      const nameSpan = element.querySelector('.dc-name') as HTMLElement;
+      if (codeSpan) {
+        codeSpan.style.color = newIsSelected ? 'rgb(100, 255, 218)' : 'rgb(241, 245, 249)';
+      }
+      if (nameSpan) {
+        nameSpan.style.color = newIsSelected ? 'rgb(203, 213, 225)' : 'rgb(148, 163, 184)';
+      }
+      
+      // 更新选中标记
+      const checkmark = element.querySelector('.dc-checkmark') as HTMLElement;
+      if (checkmark) {
+        checkmark.style.display = newIsSelected ? 'flex' : 'none';
+        checkmark.style.opacity = newIsSelected ? '1' : '0';
+      }
     }
     
-    // 立即更新UI状态（无延迟）
-    setSelectedDatacenters(prev => ({
-      ...prev,
-      [serverPlanCode]: {
-        ...prev[serverPlanCode],
-        [datacenter]: !prev[serverPlanCode]?.[datacenter]
-      }
-    }));
-    
-    // 设置新的防抖定时器，用于后续可能的操作
-    toggleDatacenterSelectionRef.current.timeout = setTimeout(() => {
-      toggleDatacenterSelectionRef.current.timeout = null;
-    }, 100);
+    // 延迟更新React状态（避免立即重渲染）
+    requestAnimationFrame(() => {
+      setSelectedDatacenters(prev => ({
+        ...prev,
+        [serverPlanCode]: {
+          ...prev[serverPlanCode],
+          [datacenter]: !prev[serverPlanCode]?.[datacenter]
+        }
+      }));
+    });
   };
 
   // 全选或取消全选特定服务器的所有数据中心
@@ -1963,14 +1987,14 @@ const ServersPage = () => {
                                 backgroundColor: isSelected ? 'rgba(100, 255, 218, 0.2)' : 'rgba(30, 41, 59, 0.6)',
                                 borderColor: isSelected ? 'rgb(100, 255, 218)' : 'rgb(51, 65, 85)'
                               }}
-                                  onClick={() => toggleDatacenterSelection(server.planCode, dcCode)}
+                                  onClick={(e) => toggleDatacenterSelection(server.planCode, dcCode, e)}
                               title={`${dc.name} (${dc.region}) - ${statusText}`}
                             >
                               <div className="flex items-center overflow-hidden mr-1.5 min-w-0">
                                 <span className={`fi fi-${dc.countryCode.toLowerCase()} mr-1.5 text-sm flex-shrink-0`} style={{ width: '16px', height: '16px', display: 'inline-block' }}></span>
                                 <div className="flex flex-col overflow-hidden min-w-0" style={{ minWidth: '60px' }}>
-                                  <span className="text-xs font-semibold truncate" style={{ color: isSelected ? 'rgb(100, 255, 218)' : 'rgb(241, 245, 249)' }}>{dcCode}</span>
-                                  <span className="text-[9px] mt-0.5 truncate" style={{ color: isSelected ? 'rgb(203, 213, 225)' : 'rgb(148, 163, 184)' }}>{dc.name}</span>
+                                  <span className="dc-code text-xs font-semibold truncate" style={{ color: isSelected ? 'rgb(100, 255, 218)' : 'rgb(241, 245, 249)' }}>{dcCode}</span>
+                                  <span className="dc-name text-[9px] mt-0.5 truncate" style={{ color: isSelected ? 'rgb(203, 213, 225)' : 'rgb(148, 163, 184)' }}>{dc.name}</span>
                                 </div>
                               </div>
                               <span className={`text-[10px] font-medium ${statusColorClass} flex items-center flex-shrink-0 min-w-[40px] justify-end`}>
@@ -1986,7 +2010,7 @@ const ServersPage = () => {
                               </span>
                                   
                                   <div 
-                                    className="absolute top-1 right-1 w-4 h-4 bg-cyber-accent rounded-full flex items-center justify-center"
+                                    className="dc-checkmark absolute top-1 right-1 w-4 h-4 bg-cyber-accent rounded-full flex items-center justify-center"
                                     style={{ 
                                       opacity: isSelected ? 1 : 0,
                                       display: isSelected ? 'flex' : 'none',
