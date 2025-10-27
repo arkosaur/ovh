@@ -4128,7 +4128,212 @@ def get_service_info(service_name):
         })
     except Exception as e:
         add_log("ERROR", f"获取服务器 {service_name} 服务信息失败: {str(e)}", "server_control")
+
+# ==============================================
+# 维护记录 API（Intervention）
+# ==============================================
+
+@app.route('/api/server-control/<service_name>/interventions', methods=['OPTIONS', 'GET'])
+def get_interventions(service_name):
+    """获取维护记录列表"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+        
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        # 获取维护记录ID列表
+        intervention_ids = client.get(f'/dedicated/server/{service_name}/intervention')
+        
+        # 获取每个维护记录的详细信息
+        interventions = []
+        for intervention_id in intervention_ids:
+            try:
+                detail = client.get(f'/dedicated/server/{service_name}/intervention/{intervention_id}')
+                interventions.append(detail)
+            except Exception as e:
+                add_log("WARNING", f"获取维护记录 {intervention_id} 详情失败: {str(e)}", "server_control")
+                continue
+        
+        return jsonify({
+            "success": True,
+            "interventions": interventions
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"获取服务器 {service_name} 维护记录失败: {str(e)}", "server_control")
         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/interventions/<intervention_id>', methods=['OPTIONS', 'GET'])
+def get_intervention_detail(service_name, intervention_id):
+    """获取维护记录详情"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+        
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        detail = client.get(f'/dedicated/server/{service_name}/intervention/{intervention_id}')
+        
+        return jsonify({
+            "success": True,
+            "intervention": detail
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"获取维护记录详情失败: {service_name} - {intervention_id} - {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ==============================================
+# 计划维护 API（Planned Intervention）
+# ==============================================
+
+@app.route('/api/server-control/<service_name>/planned-interventions', methods=['OPTIONS', 'GET'])
+def get_planned_interventions(service_name):
+    """获取计划维护列表"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+        
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        # 获取计划维护ID列表
+        intervention_ids = client.get(f'/dedicated/server/{service_name}/plannedIntervention')
+        
+        # 获取每个计划维护的详细信息
+        interventions = []
+        for intervention_id in intervention_ids:
+            try:
+                detail = client.get(f'/dedicated/server/{service_name}/plannedIntervention/{intervention_id}')
+                interventions.append(detail)
+            except Exception as e:
+                add_log("WARNING", f"获取计划维护 {intervention_id} 详情失败: {str(e)}", "server_control")
+                continue
+        
+        return jsonify({
+            "success": True,
+            "plannedInterventions": interventions
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"获取服务器 {service_name} 计划维护失败: {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/server-control/<service_name>/planned-interventions/<int:intervention_id>', methods=['OPTIONS', 'GET'])
+def get_planned_intervention_detail(service_name, intervention_id):
+    """获取计划维护详情"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+        
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        detail = client.get(f'/dedicated/server/{service_name}/plannedIntervention/{intervention_id}')
+        
+        return jsonify({
+            "success": True,
+            "plannedIntervention": detail
+        })
+        
+    except Exception as e:
+        add_log("ERROR", f"获取计划维护详情失败: {service_name} - {intervention_id} - {str(e)}", "server_control")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ==============================================
+# 硬件更换 API（Hardware Replacement）
+# ==============================================
+
+@app.route('/api/server-control/<service_name>/hardware/replace', methods=['OPTIONS', 'POST'])
+def hardware_replace(service_name):
+    """硬件更换支持（硬盘、内存、散热器）"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+        
+    client = get_ovh_client()
+    if not client:
+        return jsonify({"success": False, "error": "未配置OVH API密钥"}), 401
+    
+    try:
+        data = request.json
+        component_type = data.get('componentType')
+        comment = data.get('comment', '')
+        
+        if not component_type:
+            return jsonify({"success": False, "error": "缺少 componentType 参数"}), 400
+        
+        # 根据不同的组件类型调用不同的 OVH API
+        result = None
+        
+        if component_type == 'hardDiskDrive':
+            # 硬盘更换：需要 disks 和 inverse 参数
+            result = client.post(
+                f'/dedicated/server/{service_name}/support/replace/hardDiskDrive',
+                comment=comment or "Request hard disk drive replacement - faulty disk detected",
+                disks=[],  # 空数组表示自动检测所有故障硬盘
+                inverse=True  # 替换所有故障硬盘
+            )
+        elif component_type == 'memory':
+            # 内存更换：需要 details 参数
+            details = data.get('details', 'Memory module failure')
+            result = client.post(
+                f'/dedicated/server/{service_name}/support/replace/memory',
+                comment=comment or "Request memory module replacement - hardware failure detected",
+                details=details,
+                slotsDescription=""
+            )
+        elif component_type == 'cooling':
+            # 散热器更换：需要 details 参数
+            details = data.get('details', 'Cooling system failure')
+            result = client.post(
+                f'/dedicated/server/{service_name}/support/replace/cooling',
+                comment=comment or "Request cooling system replacement - fan failure or overheating",
+                details=details
+            )
+        else:
+            return jsonify({
+                "success": False,
+                "error": f"不支持的组件类型: {component_type}"
+            }), 400
+        
+        add_log("INFO", f"硬件更换请求已发送: {service_name} - {component_type}", "server_control")
+        
+        return jsonify({
+            "success": True,
+            "message": "硬件更换请求已发送",
+            "task": result
+        })
+        
+    except Exception as e:
+        error_msg = str(e)
+        add_log("ERROR", f"硬件更换失败: {service_name} - {component_type} - {error_msg}", "server_control")
+        
+        # 检查是否是"Action pending"错误（已有待处理的硬件更换请求）
+        if "Action pending" in error_msg:
+            # 提取 ticketId（如果有）
+            import re
+            ticket_match = re.search(r'ticketId[:\s]+(\d+)', error_msg)
+            ticket_id = ticket_match.group(1) if ticket_match else "未知"
+            
+            return jsonify({
+                "success": False,
+                "error": f"已有待处理的硬件更换工单 (Ticket #{ticket_id})，请等待完成后再提交新请求",
+                "ticketId": ticket_id,
+                "isPending": True
+            }), 400
+        
+        # 其他错误
+        return jsonify({
+            "success": False,
+            "error": error_msg
+        }), 500
 
 @app.route('/api/server-control/<service_name>/partition-schemes', methods=['GET', 'OPTIONS'])
 def get_partition_schemes(service_name):

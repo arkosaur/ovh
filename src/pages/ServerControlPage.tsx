@@ -134,6 +134,20 @@ const ServerControlPage: React.FC = () => {
   const installProgressRef = useRef<InstallProgress | null>(null); // 用于在定时器回调中访问最新状态
   const completionToastShownRef = useRef<boolean>(false); // 防止重复显示完成提示
 
+  // 硬件更换功能
+  const [showHardwareReplaceDialog, setShowHardwareReplaceDialog] = useState(false);
+  const [hardwareReplaceType, setHardwareReplaceType] = useState<'hardDiskDrive' | 'memory' | 'cooling' | ''>('');
+  const [hardwareReplaceComment, setHardwareReplaceComment] = useState('');
+  const [hardwareReplaceDetails, setHardwareReplaceDetails] = useState('');
+
+  // 维护记录功能
+  const [interventions, setInterventions] = useState<any[]>([]);
+  const [loadingInterventions, setLoadingInterventions] = useState(false);
+  
+  // 计划维护功能
+  const [plannedInterventions, setPlannedInterventions] = useState<any[]>([]);
+  const [loadingPlannedInterventions, setLoadingPlannedInterventions] = useState(false);
+
   // Task 1: 获取服务器列表（只显示活跃服务器）
   const fetchServers = async () => {
     setIsLoading(true);
@@ -775,6 +789,102 @@ const ServerControlPage: React.FC = () => {
     }
   };
 
+  // 维护记录：获取列表
+  const fetchInterventions = async (serviceName: string) => {
+    setLoadingInterventions(true);
+    try {
+      const response = await api.get(`/server-control/${serviceName}/interventions`);
+      if (response.data.success) {
+        setInterventions(response.data.interventions || []);
+      }
+    } catch (error: any) {
+      console.error('获取维护记录失败:', error);
+      setInterventions([]);
+    } finally {
+      setLoadingInterventions(false);
+    }
+  };
+
+  // 计划维护：获取列表
+  const fetchPlannedInterventions = async (serviceName: string) => {
+    setLoadingPlannedInterventions(true);
+    try {
+      const response = await api.get(`/server-control/${serviceName}/planned-interventions`);
+      if (response.data.success) {
+        setPlannedInterventions(response.data.plannedInterventions || []);
+      }
+    } catch (error: any) {
+      console.error('获取计划维护失败:', error);
+      setPlannedInterventions([]);
+    } finally {
+      setLoadingPlannedInterventions(false);
+    }
+  };
+
+  // 硬件更换：提交请求
+  const handleHardwareReplace = async () => {
+    if (!selectedServer || !hardwareReplaceType) return;
+
+    const componentNames: Record<string, string> = {
+      hardDiskDrive: '硬盘',
+      memory: '内存',
+      cooling: '散热器'
+    };
+
+    const confirmed = await showConfirm({
+      title: `申请更换${componentNames[hardwareReplaceType]}？`,
+      message: `服务器: ${selectedServer.name}\n此操作将创建硬件更换工单`,
+      confirmText: '确认申请',
+      cancelText: '取消'
+    });
+
+    if (!confirmed) return;
+
+    setIsProcessing(true);
+    try {
+      const requestData: any = {
+        componentType: hardwareReplaceType,
+        comment: hardwareReplaceComment || undefined  // 如果用户没填写，让后端使用默认英文comment
+      };
+
+      // memory 和 cooling 需要 details 参数
+      if (hardwareReplaceType === 'memory' || hardwareReplaceType === 'cooling') {
+        requestData.details = hardwareReplaceDetails || undefined;  // 如果用户没填写，让后端使用默认英文details
+      }
+
+      const response = await api.post(
+        `/server-control/${selectedServer.serviceName}/hardware/replace`,
+        requestData
+      );
+
+      if (response.data.success) {
+        showToast({ 
+          type: 'success', 
+          title: '硬件更换请求已提交成功' 
+        });
+        setShowHardwareReplaceDialog(false);
+      }
+    } catch (error: any) {
+      console.error('硬件更换请求失败:', error);
+      
+      // 检查是否是"待处理"错误
+      if (error.response?.data?.isPending) {
+        showToast({ 
+          type: 'warning', 
+          title: error.response.data.error || '已有待处理的硬件更换请求' 
+        });
+      } else {
+        showToast({ 
+          type: 'error', 
+          title: '硬件更换请求失败',
+          message: error.response?.data?.error || '未知错误'
+        });
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   useEffect(() => {
     fetchServers();
   }, []);
@@ -786,6 +896,8 @@ const ServerControlPage: React.FC = () => {
       fetchHardware(selectedServer.serviceName);
       fetchIPs(selectedServer.serviceName);
       fetchServiceInfo(selectedServer.serviceName);
+      fetchInterventions(selectedServer.serviceName);
+      fetchPlannedInterventions(selectedServer.serviceName);
     }
   }, [selectedServer]);
 
@@ -890,7 +1002,7 @@ const ServerControlPage: React.FC = () => {
                 </div>
 
                 {/* 操作按钮 */}
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                   <button
                     onClick={() => openTasksDialog(selectedServer)}
                     className="px-4 py-2 bg-cyber-grid/50 border border-cyber-accent/30 rounded-lg text-cyber-text hover:bg-cyber-accent/10 transition-all flex items-center gap-2 justify-center">
@@ -921,6 +1033,15 @@ const ServerControlPage: React.FC = () => {
                     className="px-4 py-2 bg-orange-500/10 border border-orange-500/30 rounded-lg text-orange-400 hover:bg-orange-500/20 transition-all flex items-center gap-2 justify-center disabled:opacity-50">
                     <HardDrive className="w-4 h-4" />
                     {loadingBootModes ? '加载中...' : '启动模式'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setHardwareReplaceType('');
+                      setShowHardwareReplaceDialog(true);
+                    }}
+                    className="px-4 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg text-purple-400 hover:bg-purple-500/20 transition-all flex items-center gap-2 justify-center">
+                    <Cpu className="w-4 h-4" />
+                    硬件更换
                   </button>
                 </div>
               </div>
@@ -1096,6 +1217,107 @@ const ServerControlPage: React.FC = () => {
                     {loadingMonitoring ? '处理中...' : (monitoring ? '已开启' : '已关闭')}
                   </button>
                 </div>
+              </div>
+
+              {/* 维护记录 */}
+              <div className="cyber-card">
+                <h3 className="text-lg font-semibold text-cyber-text mb-4 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-yellow-400" />
+                  维护记录
+                </h3>
+                {loadingInterventions ? (
+                  <div className="flex items-center gap-2 text-cyber-muted">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    加载中...
+                  </div>
+                ) : interventions.length > 0 ? (
+                  <div className="space-y-2">
+                    {interventions.slice(0, 5).map((intervention, idx) => (
+                      <div key={intervention.interventionId || idx} className="p-3 bg-cyber-grid/30 border border-cyber-accent/20 rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-cyber-text font-semibold">#{intervention.interventionId}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded ${
+                                intervention.status === 'done' ? 'bg-green-500/20 text-green-400' :
+                                intervention.status === 'doing' ? 'bg-blue-500/20 text-blue-400' :
+                                'bg-gray-500/20 text-gray-400'
+                              }`}>
+                                {intervention.status}
+                              </span>
+                            </div>
+                            <div className="text-sm text-cyber-muted">
+                              类型: {intervention.type || '未知'}
+                            </div>
+                            <div className="text-xs text-cyber-muted/70 mt-1">
+                              {intervention.date ? new Date(intervention.date).toLocaleString('zh-CN') : '无日期'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {interventions.length > 5 && (
+                      <div className="text-center text-cyber-muted text-sm pt-2">
+                        还有 {interventions.length - 5} 条历史记录
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-cyber-muted text-sm">暂无维护记录</p>
+                )}
+              </div>
+
+              {/* 计划维护 */}
+              <div className="cyber-card">
+                <h3 className="text-lg font-semibold text-cyber-text mb-4 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-blue-400" />
+                  计划维护 <span className="text-xs text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">BETA</span>
+                </h3>
+                {loadingPlannedInterventions ? (
+                  <div className="flex items-center gap-2 text-cyber-muted">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    加载中...
+                  </div>
+                ) : plannedInterventions.length > 0 ? (
+                  <div className="space-y-2">
+                    {plannedInterventions.map((intervention, idx) => (
+                      <div key={intervention.id || idx} className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-blue-400 font-semibold">#{intervention.id}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              intervention.status === 'confirmed' ? 'bg-green-500/20 text-green-400' :
+                              intervention.status === 'scheduled' ? 'bg-orange-500/20 text-orange-400' :
+                              'bg-gray-500/20 text-gray-400'
+                            }`}>
+                              {intervention.status}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="space-y-1 text-sm">
+                          <div className="text-cyber-text">
+                            类型: {intervention.type || '未知'}
+                          </div>
+                          {intervention.expectedEndDate && (
+                            <div className="text-cyber-muted">
+                              预计时间: {new Date(intervention.expectedEndDate).toLocaleString('zh-CN')}
+                            </div>
+                          )}
+                          {intervention.description && (
+                            <div className="text-cyber-muted/80 text-xs mt-2 p-2 bg-cyber-grid/20 rounded">
+                              {intervention.description}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <Calendar className="w-12 h-12 text-cyber-muted/30 mx-auto mb-2" />
+                    <p className="text-cyber-muted text-sm">暂无计划维护</p>
+                  </div>
+                )}
               </div>
               </>
             )}
@@ -1657,6 +1879,194 @@ const ServerControlPage: React.FC = () => {
         )}
       </AnimatePresence>,
       document.body
+      )}
+
+      {/* 硬件更换对话框 */}
+      {createPortal(
+        <AnimatePresence>
+          {showHardwareReplaceDialog && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="cyber-card max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Cpu className="w-5 h-5 text-purple-400" />
+                    <h3 className="text-xl font-semibold text-cyber-text">
+                      硬件更换申请
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowHardwareReplaceDialog(false);
+                      setHardwareReplaceType('');
+                      setHardwareReplaceComment('');
+                      setHardwareReplaceDetails('');
+                    }}
+                    className="text-cyber-muted hover:text-cyber-text transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <p className="text-cyber-muted text-sm mb-4">
+                  为 {selectedServer?.name} 提交硬件更换申请
+                </p>
+
+                {!hardwareReplaceType ? (
+                  /* 硬件类型选择界面 */
+                  <div className="space-y-3">
+                    <p className="text-cyber-text font-medium mb-3">请选择要更换的硬件类型：</p>
+                    
+                    <button
+                      onClick={() => setHardwareReplaceType('hardDiskDrive')}
+                      className="w-full p-4 bg-red-500/10 border-2 border-red-500/30 rounded-lg text-left hover:bg-red-500/20 hover:border-red-500/50 transition-all group">
+                      <div className="flex items-center gap-3">
+                        <HardDrive className="w-6 h-6 text-red-400" />
+                        <div>
+                          <h4 className="text-lg font-semibold text-red-400 group-hover:text-red-300">硬盘驱动器</h4>
+                          <p className="text-sm text-cyber-muted mt-1">申请更换故障或损坏的硬盘</p>
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => setHardwareReplaceType('memory')}
+                      className="w-full p-4 bg-orange-500/10 border-2 border-orange-500/30 rounded-lg text-left hover:bg-orange-500/20 hover:border-orange-500/50 transition-all group">
+                      <div className="flex items-center gap-3">
+                        <Cpu className="w-6 h-6 text-orange-400" />
+                        <div>
+                          <h4 className="text-lg font-semibold text-orange-400 group-hover:text-orange-300">内存（RAM）</h4>
+                          <p className="text-sm text-cyber-muted mt-1">申请更换故障的内存模块</p>
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => setHardwareReplaceType('cooling')}
+                      className="w-full p-4 bg-blue-500/10 border-2 border-blue-500/30 rounded-lg text-left hover:bg-blue-500/20 hover:border-blue-500/50 transition-all group">
+                      <div className="flex items-center gap-3">
+                        <Activity className="w-6 h-6 text-blue-400" />
+                        <div>
+                          <h4 className="text-lg font-semibold text-blue-400 group-hover:text-blue-300">散热系统</h4>
+                          <p className="text-sm text-cyber-muted mt-1">申请更换风扇或散热器</p>
+                        </div>
+                      </div>
+                    </button>
+
+                    <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4 mt-4">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-purple-300">
+                          <p className="font-semibold mb-1">提示：</p>
+                          <p>选择硬件类型后，您需要填写详细的故障信息以便OVH技术团队处理。</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* 详细信息表单 */
+                  <div className="space-y-4">
+                    {/* 组件类型显示（带返回按钮） */}
+                    <div>
+                      <label className="block text-cyber-text font-medium mb-2">组件类型</label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 px-4 py-3 bg-cyber-grid/30 border border-cyber-accent/30 rounded-lg text-cyber-text">
+                          {hardwareReplaceType === 'hardDiskDrive' && '硬盘驱动器'}
+                          {hardwareReplaceType === 'memory' && '内存（RAM）'}
+                          {hardwareReplaceType === 'cooling' && '散热系统'}
+                        </div>
+                        <button
+                          onClick={() => setHardwareReplaceType('')}
+                          className="px-3 py-3 bg-cyber-grid/50 border border-cyber-accent/30 rounded-lg text-cyber-text hover:bg-cyber-accent/10 transition-all"
+                          title="重新选择">
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Comment输入 */}
+                    <div>
+                      <label className="block text-cyber-text font-medium mb-2">
+                        备注说明（可选，建议使用英文）
+                      </label>
+                      <textarea
+                        placeholder="Describe the issue in English (optional)..."
+                        value={hardwareReplaceComment}
+                        onChange={(e) => setHardwareReplaceComment(e.target.value)}
+                        rows={3}
+                        className="w-full px-4 py-3 bg-cyber-bg border-2 border-cyber-accent/40 rounded-lg text-cyber-text placeholder-cyber-muted focus:border-cyber-accent focus:ring-2 focus:ring-cyber-accent/30 hover:border-cyber-accent/60 transition-all resize-none"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)'
+                        }}
+                      />
+                      <p className="text-xs text-cyber-muted mt-1">提交给OVH的工单内容，建议使用英文描述</p>
+                    </div>
+
+                    {/* Details 输入（仅 memory 和 cooling 需要） */}
+                    {(hardwareReplaceType === 'memory' || hardwareReplaceType === 'cooling') && (
+                      <div>
+                        <label className="block text-cyber-text font-medium mb-2">
+                          故障详情（{hardwareReplaceType === 'memory' ? '内存必填' : '散热必填'}，建议使用英文）
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={
+                            hardwareReplaceType === 'memory' 
+                              ? 'e.g., Memory module failure, slot 1' 
+                              : 'e.g., Fan noise, overheating issue'
+                          }
+                          value={hardwareReplaceDetails}
+                          onChange={(e) => setHardwareReplaceDetails(e.target.value)}
+                          className="w-full px-4 py-3 bg-cyber-bg border-2 border-cyber-accent/40 rounded-lg text-cyber-text placeholder-cyber-muted focus:border-cyber-accent focus:ring-2 focus:ring-cyber-accent/30 hover:border-cyber-accent/60 transition-all"
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)'
+                          }}
+                        />
+                        <p className="text-xs text-cyber-muted mt-1">提交给OVH的技术详情，建议使用英文描述</p>
+                      </div>
+                    )}
+
+                    {/* 警告提示 */}
+                    <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm text-orange-300">
+                          <p className="font-semibold mb-1">重要提示：</p>
+                          <ul className="list-disc list-inside space-y-1">
+                            <li>系统将创建工单提交给OVH客服</li>
+                            <li>OVH将安排硬件更换时间</li>
+                            <li>更换期间服务器可能离线</li>
+                            <li>进度更新将通过邮件通知</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 提交按钮 */}
+                    <div className="flex justify-end gap-3 mt-6">
+                      <button
+                        onClick={() => setHardwareReplaceType('')}
+                        disabled={isProcessing}
+                        className="px-4 py-2 bg-cyber-grid/50 border border-cyber-accent/30 rounded-lg text-cyber-text hover:bg-cyber-accent/10 disabled:opacity-50">
+                        返回
+                      </button>
+                      <button
+                        onClick={handleHardwareReplace}
+                        disabled={isProcessing}
+                        className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 flex items-center gap-2">
+                        {isProcessing && <RefreshCw className="w-4 h-4 animate-spin" />}
+                        提交申请
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
       )}
 
     </div>
