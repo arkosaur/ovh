@@ -7,6 +7,7 @@ import { useAPI } from '@/context/APIContext';
 
 interface Subscription {
   planCode: string;
+  serverName?: string;  // 服务器友好名称
   datacenters: string[];
   notifyAvailable: boolean;
   notifyUnavailable: boolean;
@@ -405,8 +406,15 @@ const MonitorPage = () => {
               >
                 <div className="flex justify-between items-start p-3">
                   <div className="flex-1">
-                    <p className="font-medium text-cyber-accent">{sub.planCode}</p>
-                    <p className="text-xs text-cyber-muted mt-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-medium text-cyber-accent">{sub.planCode}</p>
+                      {sub.serverName && (
+                        <span className="text-xs text-cyber-muted">
+                          | {sub.serverName}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-cyber-muted">
                       {sub.datacenters.length > 0 
                         ? `监控数据中心: ${sub.datacenters.join(', ')}`
                         : '监控所有数据中心'}

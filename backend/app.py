@@ -2233,7 +2233,20 @@ def add_subscription():
     if not plan_code:
         return jsonify({"status": "error", "message": "缺少planCode参数"}), 400
     
-    monitor.add_subscription(plan_code, datacenters, notify_available, notify_unavailable)
+    # 查询服务器名称
+    server_name = None
+    try:
+        # 从 server_plans 中查找服务器名称
+        server_info = next((s for s in server_plans if s.get("planCode") == plan_code), None)
+        if server_info:
+            server_name = server_info.get("name")
+            add_log("INFO", f"找到服务器名称: {server_name} ({plan_code})", "monitor")
+        else:
+            add_log("WARNING", f"未找到服务器 {plan_code} 的名称信息", "monitor")
+    except Exception as e:
+        add_log("WARNING", f"获取服务器名称失败: {str(e)}", "monitor")
+    
+    monitor.add_subscription(plan_code, datacenters, notify_available, notify_unavailable, server_name)
     save_subscriptions()
     
     # 如果监控未运行，自动启动
@@ -2241,7 +2254,7 @@ def add_subscription():
         monitor.start()
         add_log("INFO", "添加订阅后自动启动监控")
     
-    add_log("INFO", f"添加服务器订阅: {plan_code}")
+    add_log("INFO", f"添加服务器订阅: {plan_code} ({server_name or '未知名称'})")
     return jsonify({"status": "success", "message": f"已订阅 {plan_code}"})
 
 @app.route('/api/monitor/subscriptions/<plan_code>', methods=['DELETE'])

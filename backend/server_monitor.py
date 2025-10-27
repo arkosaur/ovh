@@ -33,7 +33,7 @@ class ServerMonitor:
         
         self.add_log("INFO", "服务器监控器初始化完成", "monitor")
     
-    def add_subscription(self, plan_code, datacenters=None, notify_available=True, notify_unavailable=False):
+    def add_subscription(self, plan_code, datacenters=None, notify_available=True, notify_unavailable=False, server_name=None):
         """
         添加服务器订阅
         
@@ -42,6 +42,7 @@ class ServerMonitor:
             datacenters: 要监控的数据中心列表，None或空列表表示监控所有
             notify_available: 是否在有货时提醒
             notify_unavailable: 是否在无货时提醒
+            server_name: 服务器友好名称（可选）
         """
         # 检查是否已存在
         existing = next((s for s in self.subscriptions if s["planCode"] == plan_code), None)
@@ -50,6 +51,9 @@ class ServerMonitor:
             existing["datacenters"] = datacenters or []
             existing["notifyAvailable"] = notify_available
             existing["notifyUnavailable"] = notify_unavailable
+            # 更新服务器名称（如果提供）
+            if server_name:
+                existing["serverName"] = server_name
             # 确保历史记录字段存在
             if "history" not in existing:
                 existing["history"] = []
@@ -65,8 +69,14 @@ class ServerMonitor:
             "history": []  # 历史记录
         }
         
+        # 添加服务器名称（如果提供）
+        if server_name:
+            subscription["serverName"] = server_name
+        
         self.subscriptions.append(subscription)
-        self.add_log("INFO", f"添加订阅: {plan_code}, 数据中心: {datacenters or '全部'}", "monitor")
+        
+        display_name = f"{plan_code} ({server_name})" if server_name else plan_code
+        self.add_log("INFO", f"添加订阅: {display_name}, 数据中心: {datacenters or '全部'}", "monitor")
     
     def remove_subscription(self, plan_code):
         """删除订阅"""
