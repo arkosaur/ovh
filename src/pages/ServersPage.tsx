@@ -51,49 +51,40 @@ const globalStyles = `
 .animate-pulse-slow {
   animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
-/* 防止Via浏览器等轻量浏览器中的闪烁 - 针对Via内核深度优化 */
+/* 防止Via浏览器(Android WebView引擎)闪烁 - WebView专属优化 */
 .datacenter-item {
-  /* Via浏览器(Chromium内核)硬件加速优化 */
+  /* WebView GPU合成层优化 - 强制创建独立图层 */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
-  -webkit-transform: translate3d(0, 0, 0);
-  transform: translate3d(0, 0, 0);
+  
+  /* WebView渲染性能优化 */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   
-  /* 强制GPU渲染层 */
-  -webkit-transform-style: preserve-3d;
-  transform-style: preserve-3d;
+  /* 关键：使用contain隔离渲染，防止重绘扩散到其他元素 */
+  contain: strict;
   
-  /* 渲染隔离 - 防止重绘扩散 */
-  contain: layout style paint;
-  isolation: isolate;
-  
-  /* 优化触摸性能 */
+  /* WebView触摸优化 */
   touch-action: manipulation;
   -webkit-user-select: none;
-  -moz-user-select: none;
   user-select: none;
   
-  /* Via浏览器特殊优化：禁用子像素渲染 */
-  -webkit-transform: translateZ(0) scale(1.0001);
-  transform: translateZ(0) scale(1.0001);
+  /* 禁用WebView的点击高亮 */
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
   
-  /* 强制整像素渲染，避免亚像素抖动 */
+  /* 强制使用整数像素，避免WebView亚像素抖动 */
   image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
   
-  /* 固定will-change，避免动态计算 */
-  will-change: transform;
+  /* 简化渲染：禁用不必要的效果 */
+  pointer-events: auto;
 }
 
-/* Via浏览器触摸反馈优化 */
+/* WebView触摸反馈 - 保持GPU加速 */
 .datacenter-item:active {
-  -webkit-tap-highlight-color: transparent;
-  tap-highlight-color: transparent;
-  /* 触摸时保持GPU加速 */
-  -webkit-transform: translateZ(0) scale(1);
-  transform: translateZ(0) scale(1);
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 `;
 
@@ -1765,7 +1756,7 @@ const ServersPage = () => {
               key={server.planCode}
               variants={itemVariants}
             >
-              <Card className="border-cyber-accent/30 overflow-hidden">
+              <Card className="border-cyber-accent/30 overflow-hidden w-full">
                 {/* Header with server code and name */}
                 <CardHeader className="px-2 sm:px-3 py-2 bg-cyber-grid/20 border-b border-cyber-accent/20">
                   <div className="flex justify-between items-center gap-2 min-w-0">
@@ -1899,7 +1890,7 @@ const ServersPage = () => {
                             <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
                           </svg>
                           <span className="tracking-wide">抢购</span>
-                          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                          <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyber-accent opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-3 w-3 bg-cyber-primary"></span>
                           </span>
@@ -1977,14 +1968,13 @@ const ServersPage = () => {
                               return (
                                 <div 
                                   key={dcCode}
-                              className={`datacenter-item relative flex items-center justify-between p-1.5 rounded cursor-pointer 
-                                          border
+                              className={`datacenter-item relative flex items-center justify-between p-1.5 rounded cursor-pointer border
                                     ${isSelected 
                                             ? 'bg-cyber-accent/20 border-cyber-accent shadow-md'
                                             : 'bg-slate-800/60 border-slate-700 hover:bg-slate-700/60 hover:border-slate-500'}
                                          `}
                               style={{ 
-                                transition: 'background-color 150ms linear, border-color 150ms linear, box-shadow 150ms linear'
+                                transition: 'none'
                               }}
                                   onClick={() => toggleDatacenterSelection(server.planCode, dcCode)}
                               title={`${dc.name} (${dc.region}) - ${statusText}`}
@@ -1992,11 +1982,11 @@ const ServersPage = () => {
                               <div className="flex items-center overflow-hidden mr-1.5 min-w-0">
                                 <span className={`fi fi-${dc.countryCode.toLowerCase()} mr-1.5 text-sm flex-shrink-0`} style={{ width: '16px', height: '16px', display: 'inline-block' }}></span>
                                 <div className="flex flex-col overflow-hidden min-w-0" style={{ minWidth: '60px' }}>
-                                  <span className={`text-xs font-semibold truncate ${isSelected ? 'text-cyber-accent' : 'text-slate-100'}`} style={{ transition: 'color 150ms linear' }}>{dcCode}</span>
-                                  <span className={`text-[9px] mt-0.5 truncate ${isSelected ? 'text-slate-300' : 'text-slate-400'}`} style={{ transition: 'color 150ms linear' }}>{dc.name}</span>
+                                  <span className={`text-xs font-semibold truncate ${isSelected ? 'text-cyber-accent' : 'text-slate-100'}`}>{dcCode}</span>
+                                  <span className={`text-[9px] mt-0.5 truncate ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>{dc.name}</span>
                                 </div>
                               </div>
-                              <span className={`text-[10px] font-medium ${statusColorClass} flex items-center flex-shrink-0 min-w-[40px] justify-end`} style={{ transition: 'color 150ms linear' }}>
+                              <span className={`text-[10px] font-medium ${statusColorClass} flex items-center flex-shrink-0 min-w-[40px] justify-end`}>
                                 {availStatus === "unknown" ? (
                                   <span className="inline-block" style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite', display: 'inline-flex' }}>
                                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
@@ -2012,8 +2002,7 @@ const ServersPage = () => {
                                     className="absolute top-1 right-1 w-4 h-4 bg-cyber-accent rounded-full flex items-center justify-center"
                                     style={{ 
                                       opacity: isSelected ? 1 : 0,
-                                      transform: isSelected ? 'scale(1)' : 'scale(0.5)',
-                                      transition: 'opacity 150ms linear, transform 150ms linear',
+                                      display: isSelected ? 'flex' : 'none',
                                       pointerEvents: 'none'
                                     }}
                                   >
