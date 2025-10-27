@@ -27,6 +27,11 @@ interface HistoryEntry {
   status: string;
   changeType: string;
   oldStatus: string | null;
+  config?: {
+    memory: string;
+    storage: string;
+    display: string;
+  };
 }
 
 const MonitorPage = () => {
@@ -277,7 +282,8 @@ const MonitorPage = () => {
         </div>
         <ul className="text-sm text-cyber-muted space-y-1">
           <li>• 监控器每 {monitorStatus.check_interval} 秒检查一次订阅的服务器可用性</li>
-          <li>• 当服务器从无货变有货时，会发送 Telegram 通知</li>
+          <li>• <span className="text-cyber-accent font-medium">配置级别监控</span>：自动监控所有配置组合（内存+存储），每个配置单独通知</li>
+          <li>• 当服务器从无货变有货时，会发送 Telegram 通知（包含配置详情）</li>
           <li>• 确保已在设置页面配置 Telegram Token 和 Chat ID</li>
           <li>• 可以指定监控特定数据中心，或留空监控所有数据中心</li>
           <li>• 点击右上角"测试通知"按钮可以立即测试 Telegram 配置</li>
@@ -476,7 +482,14 @@ const MonitorPage = () => {
                                     {entry.changeType === 'available' ? '有货' : '无货'}
                                   </span>
                                 </div>
-                                <p className="text-cyber-muted mt-1">
+                                {entry.config && (
+                                  <div className="text-xs text-cyber-muted mt-1">
+                                    <span className="inline-block px-2 py-0.5 bg-cyber-accent/10 rounded mr-1">
+                                      {entry.config.display}
+                                    </span>
+                                  </div>
+                                )}
+                                <p className="text-cyber-muted mt-1 text-xs">
                                   {new Date(entry.timestamp).toLocaleString('zh-CN', {
                                     year: 'numeric',
                                     month: '2-digit',

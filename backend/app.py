@@ -377,6 +377,71 @@ def get_ovh_client():
         add_log("ERROR", f"Failed to initialize OVH client: {str(e)}")
         return None
 
+# 监控器专用：获取所有配置组合的可用性
+def check_server_availability_with_configs(plan_code):
+    """
+    获取服务器所有配置组合的可用性（用于监控器）
+    
+    返回格式：
+    {
+        "config_key": {
+            "memory": "ram-64g",
+            "storage": "softraid-2x4000sa",
+            "datacenters": {"gra": "available", "rbx": "unavailable", ...}
+        },
+        ...
+    }
+    """
+    client = get_ovh_client()
+    if not client:
+        return {}
+    
+    try:
+        add_log("INFO", f"[配置监控] 查询 {plan_code} 的所有配置组合...", "monitor")
+        availabilities = client.get('/dedicated/server/datacenter/availabilities', planCode=plan_code)
+        
+        if not availabilities or len(availabilities) == 0:
+            add_log("WARNING", f"[配置监控] 未获取到 {plan_code} 的可用性数据", "monitor")
+            return {}
+        
+        add_log("INFO", f"[配置监控] OVH API 返回 {len(availabilities)} 个配置组合", "monitor")
+        
+        # 构建配置级别的可用性数据
+        result = {}
+        for item in availabilities:
+            memory = item.get("memory", "N/A")
+            storage = item.get("storage", "N/A")
+            fqn = item.get("fqn", "")
+            
+            # 使用 fqn 作为唯一key
+            config_key = fqn
+            
+            # 收集该配置在各个数据中心的可用性
+            datacenters = {}
+            for dc in item.get("datacenters", []):
+                dc_name = dc.get("datacenter")
+                availability = dc.get("availability", "unknown")
+                
+                if dc_name:
+                    datacenters[dc_name] = availability
+            
+            result[config_key] = {
+                "memory": memory,
+                "storage": storage,
+                "datacenters": datacenters,
+                "fqn": fqn
+            }
+            
+            add_log("INFO", f"[配置监控] 配置: {memory} + {storage}, 数据中心数: {len(datacenters)}", "monitor")
+        
+        add_log("INFO", f"[配置监控] 成功获取 {len(result)} 个配置组合的可用性", "monitor")
+        return result
+        
+    except Exception as e:
+        add_log("ERROR", f"[配置监控] 获取配置可用性失败: {str(e)}", "monitor")
+        add_log("ERROR", f"错误详情: {traceback.format_exc()}", "monitor")
+        return {}
+
 # Check availability of servers
 def check_server_availability(plan_code, options=None):
     client = get_ovh_client()
@@ -1939,7 +2004,7 @@ def init_monitor():
     """初始化监控器"""
     global monitor
     monitor = ServerMonitor(
-        check_availability_func=check_server_availability,
+        check_availability_func=check_server_availability_with_configs,  # 使用配置级别的监控
         send_notification_func=send_telegram_msg,
         add_log_func=add_log
     )

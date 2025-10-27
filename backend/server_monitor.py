@@ -87,7 +87,7 @@ class ServerMonitor:
     
     def check_availability_change(self, subscription):
         """
-        检查单个订阅的可用性变化
+        检查单个订阅的可用性变化（配置级别监控）
         
         Args:
             subscription: 订阅配置
@@ -95,7 +95,7 @@ class ServerMonitor:
         plan_code = subscription["planCode"]
         
         try:
-            # 获取当前可用性
+            # 获取当前可用性（支持配置级别）
             current_availability = self.check_availability(plan_code)
             if not current_availability:
                 self.add_log("WARNING", f"无法获取 {plan_code} 的可用性信息", "monitor")
@@ -106,100 +106,199 @@ class ServerMonitor:
             
             # 调试日志
             self.add_log("INFO", f"订阅 {plan_code} - 监控数据中心: {monitored_dcs if monitored_dcs else '全部'}", "monitor")
-            self.add_log("INFO", f"订阅 {plan_code} - 当前可用性: {current_availability}", "monitor")
-            self.add_log("INFO", f"订阅 {plan_code} - 上次状态: {last_status}", "monitor")
+            self.add_log("INFO", f"订阅 {plan_code} - 当前发现 {len(current_availability)} 个配置组合", "monitor")
             
-            # 检查每个数据中心的变化
-            for dc, status in current_availability.items():
-                # 如果指定了数据中心列表，只监控列表中的
-                if monitored_dcs and dc not in monitored_dcs:
-                    self.add_log("INFO", f"跳过数据中心 {dc}（不在监控列表中）", "monitor")
-                    continue
+            # 遍历当前所有配置组合
+            for config_key, config_data in current_availability.items():
+                # config_key 格式: "plancode.memory.storage" 或 "datacenter"
+                # config_data 格式: {"datacenters": {"dc1": "status1", ...}, "memory": "xxx", "storage": "xxx"}
                 
-                old_status = last_status.get(dc)
-                
-                # 状态变化检测
-                status_changed = False
-                change_type = None
-                
-                # 首次检查（old_status为None）且服务器可用
-                if old_status is None and status != "unavailable":
-                    if subscription.get("notifyAvailable", True):
-                        status_changed = True
-                        change_type = "available"
-                        self.add_log("INFO", f"首次检查发现 {plan_code}@{dc} 有货", "monitor")
-                
-                # 从无货变有货
-                elif old_status == "unavailable" and status != "unavailable":
-                    if subscription.get("notifyAvailable", True):
-                        status_changed = True
-                        change_type = "available"
-                        self.add_log("INFO", f"{plan_code}@{dc} 从无货变有货", "monitor")
-                
-                # 从有货变无货
-                elif old_status not in ["unavailable", None] and status == "unavailable":
-                    if subscription.get("notifyUnavailable", False):
-                        status_changed = True
-                        change_type = "unavailable"
-                        self.add_log("INFO", f"{plan_code}@{dc} 从有货变无货", "monitor")
-                
-                # 发送通知并记录历史
-                if status_changed:
-                    self.add_log("INFO", f"准备发送提醒: {plan_code}@{dc} - {change_type}", "monitor")
-                    self.send_availability_alert(plan_code, dc, status, change_type)
+                # 如果是简单的数据中心状态（旧版兼容）
+                if isinstance(config_data, str):
+                    dc = config_key
+                    status = config_data
                     
-                    # 添加到历史记录
-                    if "history" not in subscription:
-                        subscription["history"] = []
+                    # 如果指定了数据中心列表，只监控列表中的
+                    if monitored_dcs and dc not in monitored_dcs:
+                        continue
                     
-                    history_entry = {
-                        "timestamp": datetime.now().isoformat(),
-                        "datacenter": dc,
-                        "status": status,
-                        "changeType": change_type,
-                        "oldStatus": old_status
-                    }
-                    subscription["history"].append(history_entry)
+                    old_status = last_status.get(dc)
+                    self._check_and_notify_change(subscription, plan_code, dc, status, old_status, None, dc)
+                
+                # 如果是配置级别的数据（新版配置监控）
+                elif isinstance(config_data, dict) and "datacenters" in config_data:
+                    memory = config_data.get("memory", "N/A")
+                    storage = config_data.get("storage", "N/A")
+                    config_display = f"{memory} + {storage}"
                     
-                    # 限制历史记录数量，保留最近100条
-                    if len(subscription["history"]) > 100:
-                        subscription["history"] = subscription["history"][-100:]
+                    self.add_log("INFO", f"检查配置: {config_display}", "monitor")
+                    
+                    # 检查该配置在各个数据中心的可用性
+                    for dc, status in config_data["datacenters"].items():
+                        # 如果指定了数据中心列表，只监控列表中的
+                        if monitored_dcs and dc not in monitored_dcs:
+                            continue
+                        
+                        # 使用配置作为key来追踪状态
+                        status_key = f"{dc}|{config_key}"
+                        old_status = last_status.get(status_key)
+                        
+                        # 准备配置信息用于通知
+                        config_info = {
+                            "memory": memory,
+                            "storage": storage,
+                            "display": config_display
+                        }
+                        
+                        self._check_and_notify_change(subscription, plan_code, dc, status, old_status, config_info, status_key)
             
-            # 更新状态
-            subscription["lastStatus"] = current_availability
+            # 更新状态（需要转换为状态字典）
+            new_last_status = {}
+            for config_key, config_data in current_availability.items():
+                if isinstance(config_data, str):
+                    # 简单的数据中心状态
+                    new_last_status[config_key] = config_data
+                elif isinstance(config_data, dict) and "datacenters" in config_data:
+                    # 配置级别的状态
+                    for dc, status in config_data["datacenters"].items():
+                        status_key = f"{dc}|{config_key}"
+                        new_last_status[status_key] = status
+            
+            subscription["lastStatus"] = new_last_status
             
         except Exception as e:
             self.add_log("ERROR", f"检查 {plan_code} 可用性时出错: {str(e)}", "monitor")
             self.add_log("ERROR", f"错误详情: {traceback.format_exc()}", "monitor")
     
-    def send_availability_alert(self, plan_code, datacenter, status, change_type):
-        """发送可用性变化提醒"""
+    def _check_and_notify_change(self, subscription, plan_code, dc, status, old_status, config_info=None, status_key=None):
+        """
+        检查状态变化并发送通知
+        
+        Args:
+            subscription: 订阅对象
+            plan_code: 服务器型号
+            dc: 数据中心
+            status: 当前状态
+            old_status: 旧状态
+            config_info: 配置信息 {"memory": "xxx", "storage": "xxx", "display": "xxx"}
+            status_key: 状态键（用于lastStatus）
+        """
+        # 状态变化检测
+        status_changed = False
+        change_type = None
+        
+        # 首次检查（old_status为None）且服务器可用
+        if old_status is None and status != "unavailable":
+            if subscription.get("notifyAvailable", True):
+                status_changed = True
+                change_type = "available"
+                config_desc = f" [{config_info['display']}]" if config_info else ""
+                self.add_log("INFO", f"首次检查发现 {plan_code}@{dc}{config_desc} 有货", "monitor")
+        
+        # 从无货变有货
+        elif old_status == "unavailable" and status != "unavailable":
+            if subscription.get("notifyAvailable", True):
+                status_changed = True
+                change_type = "available"
+                config_desc = f" [{config_info['display']}]" if config_info else ""
+                self.add_log("INFO", f"{plan_code}@{dc}{config_desc} 从无货变有货", "monitor")
+        
+        # 从有货变无货
+        elif old_status not in ["unavailable", None] and status == "unavailable":
+            if subscription.get("notifyUnavailable", False):
+                status_changed = True
+                change_type = "unavailable"
+                config_desc = f" [{config_info['display']}]" if config_info else ""
+                self.add_log("INFO", f"{plan_code}@{dc}{config_desc} 从有货变无货", "monitor")
+        
+        # 发送通知并记录历史
+        if status_changed:
+            config_desc = f" [{config_info['display']}]" if config_info else ""
+            self.add_log("INFO", f"准备发送提醒: {plan_code}@{dc}{config_desc} - {change_type}", "monitor")
+            self.send_availability_alert(plan_code, dc, status, change_type, config_info)
+            
+            # 添加到历史记录
+            if "history" not in subscription:
+                subscription["history"] = []
+            
+            history_entry = {
+                "timestamp": datetime.now().isoformat(),
+                "datacenter": dc,
+                "status": status,
+                "changeType": change_type,
+                "oldStatus": old_status
+            }
+            
+            # 添加配置信息到历史记录
+            if config_info:
+                history_entry["config"] = config_info
+            
+            subscription["history"].append(history_entry)
+            
+            # 限制历史记录数量，保留最近100条
+            if len(subscription["history"]) > 100:
+                subscription["history"] = subscription["history"][-100:]
+    
+    def send_availability_alert(self, plan_code, datacenter, status, change_type, config_info=None):
+        """
+        发送可用性变化提醒
+        
+        Args:
+            plan_code: 服务器型号
+            datacenter: 数据中心
+            status: 状态
+            change_type: 变化类型
+            config_info: 配置信息 {"memory": "xxx", "storage": "xxx", "display": "xxx"}
+        """
         try:
             if change_type == "available":
+                # 基础消息
                 message = (
                     f"🎉 服务器上架通知！\n\n"
                     f"型号: {plan_code}\n"
                     f"数据中心: {datacenter}\n"
+                )
+                
+                # 添加配置信息（如果有）
+                if config_info:
+                    message += (
+                        f"配置: {config_info['display']}\n"
+                        f"├─ 内存: {config_info['memory']}\n"
+                        f"└─ 存储: {config_info['storage']}\n"
+                    )
+                
+                message += (
                     f"状态: {status}\n"
                     f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                     f"💡 快去抢购吧！"
                 )
             else:
+                # 基础消息
                 message = (
                     f"📦 服务器下架通知\n\n"
                     f"型号: {plan_code}\n"
                     f"数据中心: {datacenter}\n"
+                )
+                
+                # 添加配置信息（如果有）
+                if config_info:
+                    message += (
+                        f"配置: {config_info['display']}\n"
+                    )
+                
+                message += (
                     f"状态: 已无货\n"
                     f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                 )
             
-            self.add_log("INFO", f"正在发送Telegram通知: {plan_code}@{datacenter}", "monitor")
+            config_desc = f" [{config_info['display']}]" if config_info else ""
+            self.add_log("INFO", f"正在发送Telegram通知: {plan_code}@{datacenter}{config_desc}", "monitor")
             result = self.send_notification(message)
             
             if result:
-                self.add_log("INFO", f"✅ Telegram通知发送成功: {plan_code}@{datacenter} - {change_type}", "monitor")
+                self.add_log("INFO", f"✅ Telegram通知发送成功: {plan_code}@{datacenter}{config_desc} - {change_type}", "monitor")
             else:
-                self.add_log("WARNING", f"⚠️ Telegram通知发送失败: {plan_code}@{datacenter}", "monitor")
+                self.add_log("WARNING", f"⚠️ Telegram通知发送失败: {plan_code}@{datacenter}{config_desc}", "monitor")
             
         except Exception as e:
             self.add_log("ERROR", f"发送提醒时发生异常: {str(e)}", "monitor")
