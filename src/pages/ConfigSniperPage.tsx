@@ -260,9 +260,9 @@ const ConfigSniperPage: React.FC = () => {
           </div>
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
-            className="px-4 py-2 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 flex items-center justify-center gap-2 transition-all shadow-neon-sm text-sm"
+            className="px-3 sm:px-4 py-2 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 flex items-center justify-center gap-2 transition-all shadow-neon-sm text-xs sm:text-sm whitespace-nowrap"
           >
-            <Plus size={18} />
+            <Plus size={16} className="sm:w-[18px] sm:h-[18px]" />
             {showCreateForm ? '隐藏' : '新建任务'}
           </button>
         </div>
@@ -289,10 +289,23 @@ const ConfigSniperPage: React.FC = () => {
             <button
               onClick={handleQueryPlanCode}
               disabled={loading || !planCode.trim()}
-              className="px-6 py-3 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 disabled:bg-cyber-grid disabled:text-cyber-muted disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all shadow-neon-sm whitespace-nowrap text-sm"
+              className="px-4 sm:px-6 py-3 bg-cyber-accent text-white rounded-lg hover:bg-cyber-accent/80 disabled:bg-cyber-grid disabled:text-cyber-muted disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all shadow-neon-sm text-sm min-w-[100px] sm:min-w-[120px]"
             >
-              <Search size={18} />
-              {loading ? '查询中...' : '查询配置'}
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="hidden sm:inline">查询中</span>
+                </>
+              ) : (
+                <>
+                  <Search size={18} />
+                  <span className="hidden sm:inline">查询配置</span>
+                  <span className="sm:hidden">查询</span>
+                </>
+              )}
             </button>
           </div>
           {error && (
@@ -311,19 +324,21 @@ const ConfigSniperPage: React.FC = () => {
           className="cyber-card"
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-cyber-text">步骤 2: 选择配置</h2>
+            <h2 className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold text-cyber-text`}>步骤 2: 选择配置</h2>
             <button
               onClick={() => { setQueryMode('input'); setConfigs([]); setSelectedConfig(null); }}
-              className="text-cyber-muted hover:text-cyber-text transition-colors"
+              className="text-cyber-muted hover:text-cyber-text transition-colors text-xs sm:text-sm whitespace-nowrap"
             >
               ← 返回
             </button>
           </div>
           
-          <div className="mb-4 p-4 bg-cyber-accent/10 border border-cyber-accent/30 rounded-lg">
-            <p className="text-cyber-text">
-              <strong>型号:</strong> {planCode} | 
-              <strong className="ml-4">找到 {configs.length} 种配置</strong>
+          <div className="mb-4 p-3 sm:p-4 bg-cyber-accent/10 border border-cyber-accent/30 rounded-lg">
+            <p className="text-cyber-text text-xs sm:text-sm break-words">
+              <strong>型号:</strong> {planCode}
+              <br className="sm:hidden" />
+              <span className="hidden sm:inline"> | </span>
+              <strong className="sm:ml-4">找到 {configs.length} 种配置</strong>
             </p>
           </div>
 
@@ -332,35 +347,35 @@ const ConfigSniperPage: React.FC = () => {
               <div
                 key={index}
                 onClick={() => setSelectedConfig(config)}
-                className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                className={`border-2 rounded-lg p-3 sm:p-4 cursor-pointer transition-all ${
                   selectedConfig === config
                     ? 'border-cyber-accent bg-cyber-accent/5 shadow-neon'
                     : 'border-cyber-accent/30 hover:border-cyber-accent/50 bg-cyber-grid/30'
                 }`}
               >
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-4 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 sm:gap-4 mb-2">
                       <input
                         type="radio"
                         checked={selectedConfig === config}
                         onChange={() => setSelectedConfig(config)}
-                        className="w-5 h-5 accent-cyber-accent"
+                        className="w-4 h-4 sm:w-5 sm:h-5 accent-cyber-accent flex-shrink-0"
                       />
-                      <div>
-                        <p className="font-semibold text-lg text-cyber-text">{config.memory.display} + {config.storage.display}</p>
-                        <p className="text-sm text-cyber-muted">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-base sm:text-lg text-cyber-text truncate">{config.memory.display} + {config.storage.display}</p>
+                        <p className="text-xs sm:text-sm text-cyber-muted break-words">
                           {config.memory.code} | {config.storage.code}
                         </p>
                       </div>
                     </div>
                     
                     {config.matched_api2.length > 0 && (
-                      <div className="ml-9 mt-3">
-                        <p className="text-sm text-cyber-muted mb-2">
+                      <div className="ml-6 sm:ml-9 mt-3">
+                        <p className="text-xs sm:text-sm text-cyber-muted mb-2">
                           匹配的 API2 型号 ({config.match_count} 个) - 点击立即下单:
                         </p>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-1.5 sm:gap-2">
                           {config.matched_api2.map((item, idx) => (
                             item.datacenters.map((dc, dcIdx) => (
                               <button
@@ -369,10 +384,10 @@ const ConfigSniperPage: React.FC = () => {
                                   e.stopPropagation();
                                   handleQuickOrder(item.planCode, dc);
                                 }}
-                                className="px-3 py-2 text-xs rounded bg-gradient-to-br from-cyber-grid to-cyber-grid/30 border-2 border-cyber-accent/40 hover:border-cyber-accent hover:shadow-neon-md hover:scale-105 active:scale-95 transition-all flex flex-col items-center gap-0.5 min-w-[90px] group"
+                                className="px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs rounded bg-gradient-to-br from-cyber-grid to-cyber-grid/30 border-2 border-cyber-accent/40 hover:border-cyber-accent hover:shadow-neon-md hover:scale-105 active:scale-95 transition-all flex flex-col items-center gap-0.5 min-w-[75px] sm:min-w-[90px] group"
                               >
-                                <span className="font-bold text-cyber-accent group-hover:text-white transition-colors">{item.planCode}</span>
-                                <span className="text-xs text-cyber-muted group-hover:text-cyan-200 transition-colors">@{dc.toUpperCase()}</span>
+                                <span className="font-bold text-cyber-accent group-hover:text-white transition-colors text-[10px] sm:text-xs truncate max-w-full">{item.planCode}</span>
+                                <span className="text-[9px] sm:text-xs text-cyber-muted group-hover:text-cyan-200 transition-colors">@{dc.toUpperCase()}</span>
                               </button>
                             ))
                           ))}
@@ -381,16 +396,18 @@ const ConfigSniperPage: React.FC = () => {
                     )}
                   </div>
                   
-                  <div className="ml-4">
+                  <div className="ml-2 sm:ml-4 flex-shrink-0">
                     {config.match_count > 0 ? (
-                      <span className="inline-flex items-center px-3 py-1 text-sm font-medium text-green-400 bg-green-400/10 border border-green-400/30 rounded">
-                        <CheckCircle size={16} className="mr-1" />
-                        {config.match_count} 个可下单
+                      <span className="inline-flex items-center px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium text-green-400 bg-green-400/10 border border-green-400/30 rounded whitespace-nowrap">
+                        <CheckCircle size={14} className="mr-1 flex-shrink-0" />
+                        <span className="hidden sm:inline">{config.match_count} 个可下单</span>
+                        <span className="sm:hidden">{config.match_count}</span>
                       </span>
                     ) : (
-                      <span className="inline-flex items-center px-3 py-1 text-sm font-medium text-yellow-400 bg-yellow-400/10 border border-yellow-400/30 rounded">
-                        <AlertCircle size={16} className="mr-1" />
-                        暂无匹配
+                      <span className="inline-flex items-center px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium text-yellow-400 bg-yellow-400/10 border border-yellow-400/30 rounded whitespace-nowrap">
+                        <AlertCircle size={14} className="mr-1 flex-shrink-0" />
+                        <span className="hidden sm:inline">暂无匹配</span>
+                        <span className="sm:hidden">无</span>
                       </span>
                     )}
                   </div>
@@ -400,19 +417,29 @@ const ConfigSniperPage: React.FC = () => {
           </div>
 
           <div className="mt-6 flex flex-col gap-4">
-            <div className="p-4 bg-cyber-grid/30 border border-cyber-accent/30 rounded-lg">
+            <div className="p-3 sm:p-4 bg-cyber-grid/30 border border-cyber-accent/30 rounded-lg">
               <p className="text-cyber-text font-semibold mb-3 text-sm sm:text-base">选择监控模式：</p>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <button
                   onClick={() => handleCreateTask('matched')}
                   disabled={!selectedConfig || loading || selectedConfig.match_count === 0}
-                  className="flex-1 px-4 sm:px-6 py-3 sm:py-4 bg-green-500/20 border-2 border-green-500/50 text-green-400 rounded-lg hover:bg-green-500/30 hover:border-green-500 disabled:bg-cyber-grid disabled:text-cyber-muted disabled:border-cyber-grid disabled:cursor-not-allowed flex flex-col items-center gap-2 transition-all shadow-neon-sm"
+                  className="flex-1 px-3 sm:px-6 py-3 sm:py-4 bg-green-500/20 border-2 border-green-500/50 text-green-400 rounded-lg hover:bg-green-500/30 hover:border-green-500 disabled:bg-cyber-grid disabled:text-cyber-muted disabled:border-cyber-grid disabled:cursor-not-allowed flex flex-col items-center gap-2 transition-all shadow-neon-sm"
                 >
                   <div className="flex items-center gap-2">
-                    <CheckCircle size={16} />
-                    <span className="font-bold text-sm">{loading ? '创建中...' : '已匹配模式'}</span>
+                    <CheckCircle size={14} className="sm:w-4 sm:h-4" />
+                    <span className="font-bold text-xs sm:text-sm">
+                      {loading ? (
+                        <span className="flex items-center gap-1">
+                          <svg className="animate-spin h-3 w-3 sm:h-4 sm:w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          创建中
+                        </span>
+                      ) : '已匹配模式'}
+                    </span>
                   </div>
-                  <span className="text-xs text-center">
+                  <span className="text-[10px] sm:text-xs text-center">
                     监控 {selectedConfig?.match_count || 0} 个型号
                   </span>
                 </button>
@@ -420,13 +447,23 @@ const ConfigSniperPage: React.FC = () => {
                 <button
                   onClick={() => handleCreateTask('pending_match')}
                   disabled={!selectedConfig || loading}
-                  className="flex-1 px-4 sm:px-6 py-3 sm:py-4 bg-yellow-500/20 border-2 border-yellow-500/50 text-yellow-400 rounded-lg hover:bg-yellow-500/30 hover:border-yellow-500 disabled:bg-cyber-grid disabled:text-cyber-muted disabled:border-cyber-grid disabled:cursor-not-allowed flex flex-col items-center gap-2 transition-all shadow-neon-sm"
+                  className="flex-1 px-3 sm:px-6 py-3 sm:py-4 bg-yellow-500/20 border-2 border-yellow-500/50 text-yellow-400 rounded-lg hover:bg-yellow-500/30 hover:border-yellow-500 disabled:bg-cyber-grid disabled:text-cyber-muted disabled:border-cyber-grid disabled:cursor-not-allowed flex flex-col items-center gap-2 transition-all shadow-neon-sm"
                 >
                   <div className="flex items-center gap-2">
-                    <Clock size={16} />
-                    <span className="font-bold text-sm">{loading ? '创建中...' : '未匹配模式'}</span>
+                    <Clock size={14} className="sm:w-4 sm:h-4" />
+                    <span className="font-bold text-xs sm:text-sm">
+                      {loading ? (
+                        <span className="flex items-center gap-1">
+                          <svg className="animate-spin h-3 w-3 sm:h-4 sm:w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          创建中
+                        </span>
+                      ) : '未匹配模式'}
+                    </span>
                   </div>
-                  <span className="text-xs text-center">
+                  <span className="text-[10px] sm:text-xs text-center">
                     等待新增型号
                   </span>
                 </button>
@@ -435,7 +472,7 @@ const ConfigSniperPage: React.FC = () => {
             
             <button
               onClick={() => setQueryMode('input')}
-              className="px-6 py-3 border border-cyber-accent/50 text-cyber-text rounded-lg hover:bg-cyber-accent/10 transition-all"
+              className="px-4 sm:px-6 py-2.5 sm:py-3 border border-cyber-accent/50 text-cyber-text rounded-lg hover:bg-cyber-accent/10 transition-all text-sm"
             >
               ← 返回上一步
             </button>

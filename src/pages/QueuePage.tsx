@@ -257,17 +257,15 @@ const QueuePage = () => {
             <RefreshCwIcon size={12} className="mr-1" />
             刷新
           </button>
-          {queueItems.length > 0 && (
-            <button
-              onClick={clearAllQueue}
-              className="cyber-button text-xs flex items-center bg-red-500/20 hover:bg-red-500/30 text-red-400 border-red-500/30 flex-1 sm:flex-initial justify-center"
-              disabled={isLoading}
-            >
-              <Trash2Icon size={12} className="mr-1" />
-              {!isMobile && '清空队列'}
-              {isMobile && '清空'}
-            </button>
-          )}
+          <button
+            onClick={clearAllQueue}
+            className="cyber-button text-xs flex items-center bg-red-500/20 hover:bg-red-500/30 text-red-400 border-red-500/30 flex-1 sm:flex-initial justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading || queueItems.length === 0}
+          >
+            <Trash2Icon size={12} className="mr-1" />
+            {!isMobile && '清空队列'}
+            {isMobile && '清空'}
+          </button>
         </div>
         <button
           onClick={() => setShowAddForm(!showAddForm)}

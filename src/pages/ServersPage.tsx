@@ -51,6 +51,14 @@ const globalStyles = `
 .animate-pulse-slow {
   animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+/* 防止Via浏览器等轻量浏览器中的闪烁 */
+.datacenter-item {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-font-smoothing: antialiased;
+}
 `;
 
 interface ServerOption {
@@ -103,8 +111,20 @@ const ServersPage = () => {
   const hasLoadedFromCache = useRef(false);
   // 新增：标记是否真正在从API获取数据，防止并发
   const [isActuallyFetching, setIsActuallyFetching] = useState(false);
-  // 视图模式：grid 或 list
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  
+  // 视图模式：grid 或 list (移动端只支持grid)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+    // 移动端默认且仅支持grid视图
+    if (isMobile) return 'grid';
+    // 桌面端尝试从localStorage恢复，默认为grid
+    try {
+      const saved = localStorage.getItem('ovh_view_mode');
+      return (saved === 'list' || saved === 'grid') ? saved : 'grid';
+    } catch {
+      return 'grid';
+    }
+  });
+  
   // 显示模式：compact 或 detailed
   const [displayMode, setDisplayMode] = useState<'compact' | 'detailed'>('detailed');
   
@@ -114,6 +134,17 @@ const ServersPage = () => {
       setViewMode('grid');
     }
   }, [isMobile, viewMode]);
+  
+  // 保存视图模式到localStorage (仅桌面端)
+  useEffect(() => {
+    if (!isMobile) {
+      try {
+        localStorage.setItem('ovh_view_mode', viewMode);
+      } catch (error) {
+        console.error('Failed to save view mode:', error);
+      }
+    }
+  }, [viewMode, isMobile]);
   // 已订阅的服务器列表（planCode）
   // 从localStorage初始化，避免页面加载时丢失订阅状态
   const [subscribedServers, setSubscribedServers] = useState<Set<string>>(() => {
@@ -1895,29 +1926,35 @@ const ServersPage = () => {
                               return (
                                 <div 
                                   key={dcCode}
-                              className={`relative flex items-center justify-between p-1.5 rounded cursor-pointer transition-all duration-150 ease-in-out 
-                                          border 
+                              className={`datacenter-item relative flex items-center justify-between p-1.5 rounded cursor-pointer 
+                                          border
                                     ${isSelected 
                                             ? 'bg-cyber-accent/20 border-cyber-accent shadow-md'
                                             : 'bg-slate-800/60 border-slate-700 hover:bg-slate-700/60 hover:border-slate-500'}
                                          `}
+                              style={{ 
+                                transition: 'background-color 200ms ease-out, border-color 200ms ease-out, box-shadow 200ms ease-out',
+                                willChange: 'background-color, border-color'
+                              }}
                                   onClick={() => toggleDatacenterSelection(server.planCode, dcCode)}
                               title={`${dc.name} (${dc.region}) - ${statusText}`}
                             >
                               <div className="flex items-center overflow-hidden mr-1.5 min-w-0">
                                 <span className={`fi fi-${dc.countryCode.toLowerCase()} mr-1.5 text-sm flex-shrink-0`}></span>
                                 <div className="flex flex-col overflow-hidden min-w-0">
-                                  <span className={`text-xs font-semibold ${isSelected ? 'text-cyber-accent' : 'text-slate-100'} truncate`}>{dcCode}</span>
-                                  <span className={`text-[9px] ${isSelected ? 'text-slate-300' : 'text-slate-400'} mt-0.5 truncate`}>{dc.name}</span>
+                                  <span className={`text-xs font-semibold truncate ${isSelected ? 'text-cyber-accent' : 'text-slate-100'}`}>{dcCode}</span>
+                                  <span className={`text-[9px] mt-0.5 truncate ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>{dc.name}</span>
                                 </div>
                               </div>
-                              <span className={`text-[10px] font-medium ${statusColorClass} flex items-center flex-shrink-0`}>
+                              <span className={`text-[10px] font-medium ${statusColorClass} flex items-center flex-shrink-0 min-w-[40px] justify-end`}>
                                 {availStatus === "unknown" ? (
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-pulse">
-                                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                                  </svg>
+                                  <span className="inline-block" style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                                    </svg>
+                                  </span>
                                 ) : (
-                                  statusText
+                                  <span className="inline-block">{statusText}</span>
                                     )}
                               </span>
                                   
@@ -1941,8 +1978,8 @@ const ServersPage = () => {
         </motion.div>
         )}
         
-        {/* 列表视图 */}
-        {viewMode === 'list' && (
+        {/* 列表视图 - 移动端不显示 */}
+        {!isMobile && viewMode === 'list' && (
           <div className="space-y-3">
             {filteredServers.map((server) => (
               <motion.div

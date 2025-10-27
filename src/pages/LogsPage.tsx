@@ -160,9 +160,9 @@ const LogsPage = () => {
             </select>
           </div>
           
-          <div className="flex items-center justify-between sm:justify-end space-x-2 sm:col-span-2 lg:col-span-1">
-            <div className="flex items-center">
-              <label className="cursor-pointer flex items-center space-x-1.5 sm:space-x-2 text-cyber-muted hover:text-cyber-text transition-colors text-xs sm:text-sm">
+          <div className="flex items-center justify-between sm:col-span-2 lg:col-span-1 gap-1.5 sm:gap-2">
+            <div className="flex items-center flex-shrink-0">
+              <label className="cursor-pointer flex items-center space-x-1 sm:space-x-2 text-cyber-muted hover:text-cyber-text transition-colors text-xs sm:text-sm whitespace-nowrap">
                 <input
                   type="checkbox"
                   checked={autoRefresh}
@@ -174,29 +174,31 @@ const LogsPage = () => {
               </label>
             </div>
             
-            <button
-              onClick={() => fetchLogs()}
-              className="cyber-button text-xs flex items-center px-2 sm:px-3"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="sm:mr-1">
-                <polyline points="1 4 1 10 7 10"></polyline>
-                <polyline points="23 20 23 14 17 14"></polyline>
-                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
-              </svg>
-              <span className="hidden sm:inline">刷新</span>
-            </button>
-            
-            <button
-              onClick={clearLogs}
-              className="cyber-button text-xs flex items-center bg-red-500/10 border-red-500/30 hover:border-red-500/50 px-2 sm:px-3"
-              disabled={isLoading || logs.length === 0}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="sm:mr-1">
-                <path d="M3 6h18"></path>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-              <span className="hidden sm:inline">清空</span>
-            </button>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                onClick={() => fetchLogs()}
+                className="cyber-button text-xs flex items-center justify-center px-2 sm:px-3 min-w-[60px] sm:min-w-0"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="sm:mr-1">
+                  <polyline points="1 4 1 10 7 10"></polyline>
+                  <polyline points="23 20 23 14 17 14"></polyline>
+                  <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+                </svg>
+                <span className="hidden sm:inline">刷新</span>
+              </button>
+              
+              <button
+                onClick={clearLogs}
+                className="cyber-button text-xs flex items-center justify-center bg-red-500/10 border-red-500/30 hover:border-red-500/50 px-2 sm:px-3 min-w-[60px] sm:min-w-0"
+                disabled={isLoading || logs.length === 0}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="sm:mr-1">
+                  <path d="M3 6h18"></path>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                <span className="hidden sm:inline">清空</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
