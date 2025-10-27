@@ -1601,14 +1601,16 @@ const ServersPage = () => {
               </div>
             )}
 
-            {/* 紧凑模式切换 */}
-            <button
-              onClick={() => setDisplayMode(displayMode === 'compact' ? 'detailed' : 'compact')}
-              className="p-2 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded-md transition-all"
-              title={displayMode === 'compact' ? '切换到详细模式' : '切换到紧凑模式'}
-            >
-              {displayMode === 'compact' ? <Maximize2 size={16} /> : <Minimize2 size={16} />}
-            </button>
+            {/* 紧凑模式切换 - 移动端隐藏 */}
+            {!isMobile && (
+              <button
+                onClick={() => setDisplayMode(displayMode === 'compact' ? 'detailed' : 'compact')}
+                className="p-2 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded-md transition-all"
+                title={displayMode === 'compact' ? '切换到详细模式' : '切换到紧凑模式'}
+              >
+                {displayMode === 'compact' ? <Maximize2 size={16} /> : <Minimize2 size={16} />}
+              </button>
+            )}
             
             <button
               onClick={() => fetchServers(true)}
