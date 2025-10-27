@@ -50,22 +50,25 @@ const globalStyles = `
 .animate-pulse-slow {
   animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
-/* Via浏览器(Android WebView)彻底防闪烁方案 */
+/* Via浏览器(Android WebView)彻底防闪烁方案 - 平衡版 */
 .datacenter-item {
   /* 创建独立合成层 */
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
   
   /* 渲染隔离 - 不包含size，避免尺寸异常 */
   contain: layout style paint;
+  
+  /* 强制创建新的层叠上下文 */
+  isolation: isolate;
   
   /* 禁用所有动画和过渡 */
   transition: none !important;
   animation: none !important;
   
   /* WebView渲染优化 */
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
   -webkit-font-smoothing: subpixel-antialiased;
   
   /* 触摸优化 */
@@ -74,6 +77,10 @@ const globalStyles = `
   -webkit-user-select: none;
   user-select: none;
   touch-action: manipulation;
+  
+  /* 固定宽度，避免内容变化时重排 */
+  width: 100%;
+  min-width: 0;
 }
 
 /* 选中状态 - 使用固定样式避免类切换 */
@@ -1950,15 +1957,19 @@ const ServersPage = () => {
                               return (
                                 <div 
                                   key={dcCode}
-                              className={`datacenter-item ${isSelected ? 'datacenter-item-selected' : 'datacenter-item-unselected'} relative flex items-center justify-between p-1.5 rounded cursor-pointer border`}
+                              className="datacenter-item relative flex items-center justify-between p-1.5 rounded cursor-pointer border"
+                              style={{
+                                backgroundColor: isSelected ? 'rgba(100, 255, 218, 0.2)' : 'rgba(30, 41, 59, 0.6)',
+                                borderColor: isSelected ? 'rgb(100, 255, 218)' : 'rgb(51, 65, 85)'
+                              }}
                                   onClick={() => toggleDatacenterSelection(server.planCode, dcCode)}
                               title={`${dc.name} (${dc.region}) - ${statusText}`}
                             >
                               <div className="flex items-center overflow-hidden mr-1.5 min-w-0">
                                 <span className={`fi fi-${dc.countryCode.toLowerCase()} mr-1.5 text-sm flex-shrink-0`} style={{ width: '16px', height: '16px', display: 'inline-block' }}></span>
                                 <div className="flex flex-col overflow-hidden min-w-0" style={{ minWidth: '60px' }}>
-                                  <span className={`text-xs font-semibold truncate ${isSelected ? 'text-cyber-accent' : 'text-slate-100'}`}>{dcCode}</span>
-                                  <span className={`text-[9px] mt-0.5 truncate ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>{dc.name}</span>
+                                  <span className="text-xs font-semibold truncate" style={{ color: isSelected ? 'rgb(100, 255, 218)' : 'rgb(241, 245, 249)' }}>{dcCode}</span>
+                                  <span className="text-[9px] mt-0.5 truncate" style={{ color: isSelected ? 'rgb(203, 213, 225)' : 'rgb(148, 163, 184)' }}>{dc.name}</span>
                                 </div>
                               </div>
                               <span className={`text-[10px] font-medium ${statusColorClass} flex items-center flex-shrink-0 min-w-[40px] justify-end`}>
