@@ -50,50 +50,25 @@ const globalStyles = `
 .animate-pulse-slow {
   animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
-/* Via浏览器(Android WebView)彻底防闪烁方案 - 最终版 */
-.datacenter-item {
-  /* 完全隔离渲染 - 使用strict但手动控制宽度 */
-  contain: strict;
-  
-  /* 手动指定尺寸，避免contain: strict的宽度塌陷 */
-  width: 100% !important;
-  height: auto !important;
-  min-height: 48px;
-  
-  /* 创建独立合成层 */
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-  
-  /* 强制创建新的层叠上下文 */
-  isolation: isolate;
-  
-  /* 禁用所有动画和过渡 */
+/* Via浏览器(Android WebView)极简防闪烁方案 */
+.dc-item {
+  position: relative;
+  -webkit-transform: translate3d(0,0,0);
+  transform: translate3d(0,0,0);
   transition: none !important;
-  animation: none !important;
-  
-  /* WebView渲染优化 */
-  -webkit-font-smoothing: subpixel-antialiased;
-  
-  /* 触摸优化 */
   -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-  touch-action: manipulation;
 }
 
-/* 选中状态 - 使用固定样式避免类切换 */
-.datacenter-item-selected {
-  background-color: rgba(100, 255, 218, 0.2) !important;
-  border-color: rgb(100, 255, 218) !important;
+.dc-item-selected {
+  background: rgba(100, 255, 218, 0.2) !important;
+  border: 1px solid rgb(100, 255, 218) !important;
 }
 
-/* 未选中状态 */
-.datacenter-item-unselected {
-  background-color: rgba(30, 41, 59, 0.6) !important;
-  border-color: rgb(51, 65, 85) !important;
+.dc-item-unselected {
+  background: rgba(30, 41, 59, 0.6) !important;
+  border: 1px solid rgb(51, 65, 85) !important;
 }
 `;
 
@@ -1940,87 +1915,58 @@ const ServersPage = () => {
                       </div>
                     </div>
                     
-                    {/* 数据中心列表 - 采用用户截图样式，一行1-2列 */}
-                    <div className="bg-slate-900/10 p-1.5 sm:p-2 overflow-hidden">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
+                    {/* 数据中心列表 - Via浏览器极简优化版 */}
+                    <div className="bg-slate-900/10 p-1.5 sm:p-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {OVH_DATACENTERS
                           .filter(dc => {
-                            // 如果服务器代码包含特定数据中心后缀，只显示对应的数据中心
                             const planCodeLower = server.planCode.toLowerCase();
-                            
-                            // 检查是否为特定区域的服务器（通过后缀判断）
-                            if (planCodeLower.includes('-sgp')) {
-                              return dc.code === 'sgp';
-                            }
-                            if (planCodeLower.includes('-syd')) {
-                              return dc.code === 'syd';
-                            }
-                            if (planCodeLower.includes('-mum')) {
-                              return dc.code === 'mum'; // 孟买（前端用mum，API返回ynm）
-                            }
-                            
-                            // 默认显示所有数据中心
+                            if (planCodeLower.includes('-sgp')) return dc.code === 'sgp';
+                            if (planCodeLower.includes('-syd')) return dc.code === 'syd';
+                            if (planCodeLower.includes('-mum')) return dc.code === 'mum';
                             return true;
                           })
                           .map(dc => {
                               const dcCode = dc.code.toUpperCase();
-                          // Ensure availability and selectedDatacenters are correctly scoped to the current server
                               const availStatus = availability[server.planCode]?.[dcCode.toLowerCase()] || "unknown";
                               const isSelected = selectedDatacenters[server.planCode]?.[dcCode];
                               
                           let statusText = "查询中";
-                          let statusColorClass = "text-yellow-400";
+                          let statusColor = "rgb(250, 204, 21)";
                               
                               if (availStatus === "unavailable") {
                             statusText = "不可用";
-                            statusColorClass = "text-red-500";
+                            statusColor = "rgb(239, 68, 68)";
                               } else if (availStatus && availStatus !== "unknown") {
                             statusText = availStatus.includes("H") ? availStatus : "可用";
-                            statusColorClass = "text-green-400";
+                            statusColor = "rgb(74, 222, 128)";
                               }
                               
                               return (
                                 <div 
                                   key={dcCode}
-                              className="datacenter-item relative flex items-center justify-between p-1.5 rounded cursor-pointer border"
-                              style={{
-                                backgroundColor: isSelected ? 'rgba(100, 255, 218, 0.2)' : 'rgba(30, 41, 59, 0.6)',
-                                borderColor: isSelected ? 'rgb(100, 255, 218)' : 'rgb(51, 65, 85)'
-                              }}
+                              className={`dc-item ${isSelected ? 'dc-item-selected' : 'dc-item-unselected'} flex items-center justify-between p-2 rounded cursor-pointer`}
                                   onClick={(e) => toggleDatacenterSelection(server.planCode, dcCode, e)}
                               title={`${dc.name} (${dc.region}) - ${statusText}`}
                             >
-                              <div className="flex items-center overflow-hidden mr-1.5 min-w-0">
-                                <span className={`fi fi-${dc.countryCode.toLowerCase()} mr-1.5 text-sm flex-shrink-0`} style={{ width: '16px', height: '16px', display: 'inline-block' }}></span>
-                                <div className="flex flex-col overflow-hidden min-w-0" style={{ minWidth: '60px' }}>
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <span className={`fi fi-${dc.countryCode.toLowerCase()} flex-shrink-0`} style={{ fontSize: '14px' }}></span>
+                                <div className="flex flex-col min-w-0 flex-1">
                                   <span className="dc-code text-xs font-semibold truncate" style={{ color: isSelected ? 'rgb(100, 255, 218)' : 'rgb(241, 245, 249)' }}>{dcCode}</span>
-                                  <span className="dc-name text-[9px] mt-0.5 truncate" style={{ color: isSelected ? 'rgb(203, 213, 225)' : 'rgb(148, 163, 184)' }}>{dc.name}</span>
+                                  <span className="dc-name text-[10px] truncate" style={{ color: isSelected ? 'rgb(203, 213, 225)' : 'rgb(148, 163, 184)' }}>{dc.name}</span>
                                 </div>
                               </div>
-                              <span className={`text-[10px] font-medium ${statusColorClass} flex items-center flex-shrink-0 min-w-[40px] justify-end`}>
-                                {availStatus === "unknown" ? (
-                                  <span className="inline-block" style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite', display: 'inline-flex' }}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
-                                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                                    </svg>
-                                  </span>
-                                ) : (
-                                  <span className="inline-block" style={{ display: 'inline-block', minWidth: '32px', textAlign: 'right' }}>{statusText}</span>
-                                    )}
+                              <span className="text-[10px] font-medium flex-shrink-0 ml-2" style={{ color: statusColor, minWidth: '36px', textAlign: 'right' }}>
+                                {availStatus === "unknown" ? "⋯" : statusText}
                               </span>
                                   
-                                  <div 
-                                    className="dc-checkmark absolute top-1 right-1 w-4 h-4 bg-cyber-accent rounded-full flex items-center justify-center"
-                                    style={{ 
-                                      opacity: isSelected ? 1 : 0,
-                                      display: isSelected ? 'flex' : 'none',
-                                      pointerEvents: 'none'
-                                    }}
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
-                                      <polyline points="20 6 9 17 4 12"></polyline>
-                                    </svg>
-                                  </div>
+                                  {isSelected && (
+                                <div className="dc-checkmark absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center" style={{ background: 'rgb(100, 255, 218)', pointerEvents: 'none' }}>
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                  </svg>
+                                </div>
+                                  )}
                                 </div>
                               );
                             })}
