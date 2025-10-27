@@ -404,21 +404,21 @@ const MonitorPage = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-cyber-grid/10 rounded border border-cyber-accent/20 hover:border-cyber-accent/40 transition-colors overflow-hidden"
               >
-                <div className="flex justify-between items-start p-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium text-cyber-accent">{sub.planCode}</p>
-                      {sub.serverName && (
-                        <span className="text-xs text-cyber-muted">
-                          | {sub.serverName}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-cyber-muted">
-                      {sub.datacenters.length > 0 
-                        ? `监控数据中心: ${sub.datacenters.join(', ')}`
-                        : '监控所有数据中心'}
-                    </p>
+                 <div className="flex justify-between items-start p-3">
+                   <div className="flex-1">
+                     <div className="flex items-center gap-2 mb-1">
+                       <p className="font-medium text-cyber-accent">{sub.planCode}</p>
+                       {sub.serverName && (
+                         <span className="text-xs text-cyber-muted">
+                           | {sub.serverName}
+                         </span>
+                       )}
+                     </div>
+                     <p className="text-xs text-cyber-muted">
+                       {sub.datacenters.length > 0 
+                         ? `监控数据中心: ${sub.datacenters.join(', ')}`
+                         : '监控所有数据中心'}
+                     </p>
                     <div className="flex gap-2 mt-2">
                       {sub.notifyAvailable && (
                         <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded">

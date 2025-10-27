@@ -42,7 +42,7 @@ class ServerMonitor:
             datacenters: 要监控的数据中心列表，None或空列表表示监控所有
             notify_available: 是否在有货时提醒
             notify_unavailable: 是否在无货时提醒
-            server_name: 服务器友好名称（可选）
+            server_name: 服务器友好名称（如"KS-2 | Intel Xeon-D 1540"）
         """
         # 检查是否已存在
         existing = next((s for s in self.subscriptions if s["planCode"] == plan_code), None)
@@ -225,7 +225,9 @@ class ServerMonitor:
         if status_changed:
             config_desc = f" [{config_info['display']}]" if config_info else ""
             self.add_log("INFO", f"准备发送提醒: {plan_code}@{dc}{config_desc} - {change_type}", "monitor")
-            self.send_availability_alert(plan_code, dc, status, change_type, config_info)
+            # 获取服务器名称
+            server_name = subscription.get("serverName")
+            self.send_availability_alert(plan_code, dc, status, change_type, config_info, server_name)
             
             # 添加到历史记录
             if "history" not in subscription:
@@ -249,7 +251,7 @@ class ServerMonitor:
             if len(subscription["history"]) > 100:
                 subscription["history"] = subscription["history"][-100:]
     
-    def send_availability_alert(self, plan_code, datacenter, status, change_type, config_info=None):
+    def send_availability_alert(self, plan_code, datacenter, status, change_type, config_info=None, server_name=None):
         """
         发送可用性变化提醒
         
@@ -259,15 +261,19 @@ class ServerMonitor:
             status: 状态
             change_type: 变化类型
             config_info: 配置信息 {"memory": "xxx", "storage": "xxx", "display": "xxx"}
+            server_name: 服务器友好名称（如"KS-2 | Intel Xeon-D 1540"）
         """
         try:
             if change_type == "available":
                 # 基础消息
-                message = (
-                    f"🎉 服务器上架通知！\n\n"
-                    f"型号: {plan_code}\n"
-                    f"数据中心: {datacenter}\n"
-                )
+                message = f"🎉 服务器上架通知！\n\n"
+                
+                # 添加服务器名称（如果有）
+                if server_name:
+                    message += f"服务器: {server_name}\n"
+                
+                message += f"型号: {plan_code}\n"
+                message += f"数据中心: {datacenter}\n"
                 
                 # 添加配置信息（如果有）
                 if config_info:
@@ -284,11 +290,14 @@ class ServerMonitor:
                 )
             else:
                 # 基础消息
-                message = (
-                    f"📦 服务器下架通知\n\n"
-                    f"型号: {plan_code}\n"
-                    f"数据中心: {datacenter}\n"
-                )
+                message = f"📦 服务器下架通知\n\n"
+                
+                # 添加服务器名称（如果有）
+                if server_name:
+                    message += f"服务器: {server_name}\n"
+                
+                message += f"型号: {plan_code}\n"
+                message += f"数据中心: {datacenter}\n"
                 
                 # 添加配置信息（如果有）
                 if config_info:

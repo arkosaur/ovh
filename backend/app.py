@@ -179,7 +179,8 @@ def load_data():
                                 sub['planCode'],
                                 sub.get('datacenters', []),
                                 sub.get('notifyAvailable', True),
-                                sub.get('notifyUnavailable', False)
+                                sub.get('notifyUnavailable', False),
+                                sub.get('serverName')  # 恢复服务器名称
                             )
                     # 恢复已知服务器列表
                     if 'known_servers' in subscriptions_data:
@@ -2233,10 +2234,9 @@ def add_subscription():
     if not plan_code:
         return jsonify({"status": "error", "message": "缺少planCode参数"}), 400
     
-    # 查询服务器名称
+    # 从 server_plans 中获取服务器名称
     server_name = None
     try:
-        # 从 server_plans 中查找服务器名称
         server_info = next((s for s in server_plans if s.get("planCode") == plan_code), None)
         if server_info:
             server_name = server_info.get("name")
