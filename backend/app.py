@@ -94,6 +94,9 @@ server_list_cache = {
     "cache_duration": 2 * 60 * 60  # 缓存2小时
 }
 
+# 自动刷新缓存的后台线程标志
+auto_refresh_running = False
+
 # 初始化监控器（需要在函数定义后才能传入函数引用）
 monitor = None
 
@@ -160,6 +163,10 @@ def load_data():
                 content = f.read().strip()
                 if content:  # 确保文件不是空的
                     server_plans = json.loads(content)
+                    # 将文件数据同步到缓存
+                    server_list_cache["data"] = server_plans
+                    server_list_cache["timestamp"] = time.time()
+                    print(f"已从文件加载 {len(server_plans)} 台服务器，并同步到缓存")
                 else:
                     print(f"警告: {SERVERS_FILE}文件为空，使用空列表")
         except json.JSONDecodeError:
@@ -975,6 +982,60 @@ def start_queue_processor():
     thread = threading.Thread(target=process_queue)
     thread.daemon = True
     thread.start()
+
+# 自动刷新缓存的后台线程
+def auto_refresh_cache_loop():
+    """自动刷新服务器列表缓存（每2小时）"""
+    global auto_refresh_running, server_list_cache, server_plans
+    
+    auto_refresh_running = True
+    add_log("INFO", "服务器列表自动刷新已启动（每2小时更新一次）", "auto_refresh")
+    
+    while auto_refresh_running:
+        try:
+            # 每2小时刷新一次
+            time.sleep(2 * 60 * 60)  # 2小时
+            
+            # 检查是否配置了API
+            if not get_ovh_client():
+                add_log("WARNING", "未配置API，跳过自动刷新", "auto_refresh")
+                continue
+            
+            add_log("INFO", "开始自动刷新服务器列表...", "auto_refresh")
+            
+            # 从API加载服务器列表
+            api_servers = load_server_list()
+            
+            if api_servers and len(api_servers) > 0:
+                # 更新缓存和全局变量
+                server_plans = api_servers
+                server_list_cache["data"] = api_servers
+                server_list_cache["timestamp"] = time.time()
+                save_data()
+                update_stats()
+                
+                add_log("INFO", f"自动刷新完成：已更新 {len(server_plans)} 台服务器", "auto_refresh")
+            else:
+                add_log("WARNING", "自动刷新失败：API返回空数据", "auto_refresh")
+                
+        except Exception as e:
+            add_log("ERROR", f"自动刷新缓存时出错: {str(e)}", "auto_refresh")
+            add_log("ERROR", f"完整错误堆栈: {traceback.format_exc()}", "auto_refresh")
+
+# Start auto refresh cache thread
+def start_auto_refresh_cache():
+    """启动自动刷新缓存的线程"""
+    global auto_refresh_running
+    
+    # 防止重复启动
+    if auto_refresh_running:
+        add_log("WARNING", "自动刷新缓存已在运行，跳过重复启动", "auto_refresh")
+        return
+    
+    thread = threading.Thread(target=auto_refresh_cache_loop)
+    thread.daemon = True
+    thread.start()
+    add_log("INFO", "自动刷新缓存线程已启动", "auto_refresh")
 
 # Load server list from OVH API
 def load_server_list():
@@ -2383,7 +2444,7 @@ def get_servers():
         # 缓存失效或强制刷新，从API重新加载
         add_log("INFO", "正在从OVH API重新加载服务器列表...")
         api_servers = load_server_list()
-        if api_servers:
+        if api_servers and len(api_servers) > 0:  # 确保返回有效数据
             server_plans = api_servers
             # 更新缓存
             server_list_cache["data"] = api_servers
@@ -2401,7 +2462,19 @@ def get_servers():
             add_log("INFO", f"服务器硬件信息统计: CPU={cpu_count}/{len(server_plans)}, 内存={memory_count}/{len(server_plans)}, "
                    f"存储={storage_count}/{len(server_plans)}, 带宽={bandwidth_count}/{len(server_plans)}")
         else:
-            add_log("WARNING", "从OVH API加载服务器列表失败")
+            # API返回空数据，尝试使用旧的缓存或全局变量
+            add_log("WARNING", f"从OVH API加载服务器列表失败或返回空数据")
+            if server_list_cache["data"] and len(server_list_cache["data"]) > 0:
+                # 内存缓存有数据，使用缓存
+                server_plans = server_list_cache["data"]
+                add_log("INFO", f"使用内存缓存数据（共 {len(server_plans)} 台服务器）")
+            elif len(server_plans) > 0:
+                # 全局变量有数据（可能是从文件加载的），使用全局变量
+                add_log("INFO", f"使用全局服务器数据（共 {len(server_plans)} 台服务器）")
+            else:
+                # 完全没有数据，返回空数组
+                server_plans = []
+                add_log("ERROR", "API返回空数据且没有缓存可用，返回空列表！")
     elif not cache_valid and server_list_cache["data"]:
         # 缓存过期但未认证，使用过期缓存
         add_log("INFO", "缓存已过期但未配置API，使用过期缓存数据")
@@ -2438,6 +2511,11 @@ def get_servers():
         
         validated_servers.append(validated_server)
     
+    # 计算下一次自动刷新的时间
+    next_refresh_time = None
+    if server_list_cache["timestamp"]:
+        next_refresh_time = server_list_cache["timestamp"] + server_list_cache["cache_duration"]
+    
     # 返回服务器列表和缓存信息
     response_data = {
         "servers": validated_servers,
@@ -2445,7 +2523,9 @@ def get_servers():
             "cached": cache_valid,
             "timestamp": server_list_cache["timestamp"],
             "cacheAge": int(time.time() - server_list_cache["timestamp"]) if server_list_cache["timestamp"] else None,
-            "cacheDuration": server_list_cache["cache_duration"]
+            "cacheDuration": server_list_cache["cache_duration"],
+            "nextAutoRefresh": next_refresh_time,
+            "autoRefreshEnabled": True
         }
     }
     return jsonify(response_data)
@@ -5006,6 +5086,9 @@ if __name__ == '__main__':
         
         # 启动配置绑定狙击监控
         start_config_sniper_monitor()
+        
+        # 启动自动刷新缓存
+        start_auto_refresh_cache()
     else:
         print("跳过后台线程启动（等待主进程）")
     
