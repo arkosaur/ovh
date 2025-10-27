@@ -50,16 +50,21 @@ const globalStyles = `
 .animate-pulse-slow {
   animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
-/* Via浏览器(Android WebView)彻底防闪烁方案 - 平衡版 */
+/* Via浏览器(Android WebView)彻底防闪烁方案 - 最终版 */
 .datacenter-item {
+  /* 完全隔离渲染 - 使用strict但手动控制宽度 */
+  contain: strict;
+  
+  /* 手动指定尺寸，避免contain: strict的宽度塌陷 */
+  width: 100% !important;
+  height: auto !important;
+  min-height: 48px;
+  
   /* 创建独立合成层 */
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
-  
-  /* 渲染隔离 - 不包含size，避免尺寸异常 */
-  contain: layout style paint;
   
   /* 强制创建新的层叠上下文 */
   isolation: isolate;
@@ -77,10 +82,6 @@ const globalStyles = `
   -webkit-user-select: none;
   user-select: none;
   touch-action: manipulation;
-  
-  /* 固定宽度，避免内容变化时重排 */
-  width: 100%;
-  min-width: 0;
 }
 
 /* 选中状态 - 使用固定样式避免类切换 */
