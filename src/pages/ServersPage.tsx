@@ -53,12 +53,11 @@ const globalStyles = `
 /* Via浏览器(Android WebView)彻底防闪烁方案 */
 .datacenter-item {
   /* 创建独立合成层 */
-  will-change: contents;
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
   
-  /* 完全隔离渲染 */
-  contain: strict;
+  /* 渲染隔离 - 不包含size，避免尺寸异常 */
+  contain: layout style paint;
   
   /* 禁用所有动画和过渡 */
   transition: none !important;
