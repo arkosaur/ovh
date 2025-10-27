@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
 import { useAPI } from "@/context/APIContext";
 import { api } from "@/utils/apiClient";
 import { toast } from "sonner";
@@ -51,40 +50,43 @@ const globalStyles = `
 .animate-pulse-slow {
   animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
-/* 防止Via浏览器(Android WebView引擎)闪烁 - WebView专属优化 */
+/* Via浏览器(Android WebView)彻底防闪烁方案 */
 .datacenter-item {
-  /* WebView GPU合成层优化 - 强制创建独立图层 */
+  /* 创建独立合成层 */
+  will-change: contents;
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
   
-  /* WebView渲染性能优化 */
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  
-  /* 关键：使用contain隔离渲染，防止重绘扩散到其他元素 */
+  /* 完全隔离渲染 */
   contain: strict;
   
-  /* WebView触摸优化 */
-  touch-action: manipulation;
+  /* 禁用所有动画和过渡 */
+  transition: none !important;
+  animation: none !important;
+  
+  /* WebView渲染优化 */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-font-smoothing: subpixel-antialiased;
+  
+  /* 触摸优化 */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-  
-  /* 禁用WebView的点击高亮 */
-  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-  
-  /* 强制使用整数像素，避免WebView亚像素抖动 */
-  image-rendering: -webkit-optimize-contrast;
-  
-  /* 简化渲染：禁用不必要的效果 */
-  pointer-events: auto;
+  touch-action: manipulation;
 }
 
-/* WebView触摸反馈 - 保持GPU加速 */
-.datacenter-item:active {
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
+/* 选中状态 - 使用固定样式避免类切换 */
+.datacenter-item-selected {
+  background-color: rgba(100, 255, 218, 0.2) !important;
+  border-color: rgb(100, 255, 218) !important;
+}
+
+/* 未选中状态 */
+.datacenter-item-unselected {
+  background-color: rgba(30, 41, 59, 0.6) !important;
+  border-color: rgb(51, 65, 85) !important;
 }
 `;
 
@@ -1572,31 +1574,12 @@ const ServersPage = () => {
     );
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1,
-      transition: { 
-        staggerChildren: 0.05
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 }
-  };
-
   return (
-    <div className="space-y-6 max-w-full overflow-x-hidden">
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
+    <div className="space-y-6 w-full" style={{ maxWidth: '100%', overflowX: 'hidden' }}>
+      <div className="mb-2">
         <h1 className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold mb-1 cyber-glow-text`}>服务器列表</h1>
-        <p className="text-cyber-muted mb-4 sm:mb-6 text-xs sm:text-sm">浏览可用服务器与实时可用性检测</p>
-      </motion.div>
+        <p className="text-cyber-muted text-xs sm:text-sm">浏览可用服务器与实时可用性检测</p>
+      </div>
       
       {/* 添加全局样式 */}
       <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
@@ -1741,10 +1724,7 @@ const ServersPage = () => {
         <>
         {/* 网格视图 */}
         {viewMode === 'grid' && (
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
+          <div
             className={`grid gap-4 sm:gap-6 w-full ${
               displayMode === 'compact'
                 ? 'grid-cols-1 lg:grid-cols-3 xl:grid-cols-4'
@@ -1752,9 +1732,8 @@ const ServersPage = () => {
             }`}
           >
             {filteredServers.map((server) => (
-            <motion.div 
+            <div 
               key={server.planCode}
-              variants={itemVariants}
             >
               <Card className="border-cyber-accent/30 overflow-hidden w-full">
                 {/* Header with server code and name */}
@@ -1968,14 +1947,7 @@ const ServersPage = () => {
                               return (
                                 <div 
                                   key={dcCode}
-                              className={`datacenter-item relative flex items-center justify-between p-1.5 rounded cursor-pointer border
-                                    ${isSelected 
-                                            ? 'bg-cyber-accent/20 border-cyber-accent shadow-md'
-                                            : 'bg-slate-800/60 border-slate-700 hover:bg-slate-700/60 hover:border-slate-500'}
-                                         `}
-                              style={{ 
-                                transition: 'none'
-                              }}
+                              className={`datacenter-item ${isSelected ? 'datacenter-item-selected' : 'datacenter-item-unselected'} relative flex items-center justify-between p-1.5 rounded cursor-pointer border`}
                                   onClick={() => toggleDatacenterSelection(server.planCode, dcCode)}
                               title={`${dc.name} (${dc.region}) - ${statusText}`}
                             >
@@ -2018,21 +1990,18 @@ const ServersPage = () => {
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
+            </div>
           ))}
-        </motion.div>
+        </div>
         )}
         
         {/* 列表视图 - 移动端不显示 */}
         {!isMobile && viewMode === 'list' && (
           <div className="space-y-3">
             {filteredServers.map((server) => (
-              <motion.div
+              <div
                 key={server.planCode}
-                variants={itemVariants}
-                initial="hidden"
-                animate="visible"
-                className="bg-cyber-grid/10 border border-cyber-accent/30 rounded-md overflow-hidden hover:border-cyber-accent/50 transition-colors"
+                className="bg-cyber-grid/10 border border-cyber-accent/30 rounded-md overflow-hidden w-full"
               >
                 <div className={`flex items-center gap-4 ${displayMode === 'compact' ? 'p-3' : 'p-4'}`}>
                   {/* 服务器型号 */}
@@ -2197,7 +2166,7 @@ const ServersPage = () => {
                     </div>
                   </div>
                 )}
-              </motion.div>
+              </div>
             ))}
           </div>
         )}
