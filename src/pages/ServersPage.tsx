@@ -1701,7 +1701,7 @@ const ServersPage = () => {
             </Card>
           ))}
         </div>
-      ) : !isLoading && filteredServers.length === 0 ? (
+      ) : !isLoading && filteredServers.length === 0 && servers.length > 0 && (searchTerm || selectedDatacenter !== "all") ? (
         <Card className="border-cyber-accent/30 py-10">
           <CardContent className="flex flex-col items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-muted mx-auto mb-4">
@@ -1722,7 +1722,7 @@ const ServersPage = () => {
             </button>
           </CardContent>
         </Card>
-      ) : (
+      ) : filteredServers.length > 0 ? (
         <>
         {/* 网格视图 */}
         {viewMode === 'grid' && (
@@ -2175,7 +2175,7 @@ const ServersPage = () => {
           </div>
         )}
         </>
-      )}
+      ) : null}
     </div>
   );
 };
