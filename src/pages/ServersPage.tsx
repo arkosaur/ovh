@@ -1600,8 +1600,8 @@ const ServersPage = () => {
       </div>
 
       {/* Filters and controls */}
-      <div className="cyber-panel p-3 sm:p-4 mb-4 sm:mb-6">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+      <div className="cyber-panel p-3 sm:p-4 mb-4 sm:mb-6 w-full">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 w-full">
           <div className="relative flex-1 sm:max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-muted">
@@ -1618,11 +1618,13 @@ const ServersPage = () => {
             />
           </div>
           
-          <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4">
+          <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 flex-wrap">
             <div className="flex items-center flex-shrink-0">
-              <Clock size={14} className="text-cyber-muted mr-1 sm:mr-1.5" />
+              <Clock size={isMobile ? 12 : 14} className="text-cyber-muted mr-1 sm:mr-1.5" />
               <span className="text-[10px] sm:text-xs text-cyber-muted whitespace-nowrap">
-                {isMobile ? formatDateTime(lastUpdated).split(' ')[1] : `更新于: ${formatDateTime(lastUpdated)}`}
+                {isMobile 
+                  ? (lastUpdated ? formatDateTime(lastUpdated).split(' ')[1] || formatDateTime(lastUpdated) : '未知')
+                  : `更新: ${formatDateTime(lastUpdated)}`}
               </span>
             </div>
             
@@ -1675,14 +1677,14 @@ const ServersPage = () => {
                 <polyline points="23 20 23 14 17 14"></polyline>
                 <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
               </svg>
-              <span className="hidden sm:inline">刷新</span>
+              刷新
             </button>
           </div>
         </div>
       </div>
 
       {/* Loading state */}
-      {isLoading ? (
+      {isLoading && !hasLoadedFromCache.current ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="animate-pulse border-cyber-accent/30">
@@ -1699,7 +1701,7 @@ const ServersPage = () => {
             </Card>
           ))}
         </div>
-      ) : filteredServers.length === 0 ? (
+      ) : !isLoading && filteredServers.length === 0 ? (
         <Card className="border-cyber-accent/30 py-10">
           <CardContent className="flex flex-col items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-muted mx-auto mb-4">
@@ -1800,35 +1802,35 @@ const ServersPage = () => {
                   {renderServerOptions(server)}
                   
                   {/* Datacenters availability section - REINSTATED */}
-                  <div className="mt-3 sm:mt-4 rounded-md overflow-hidden border border-cyber-accent/30">
-                    <div className="flex justify-between items-center bg-cyber-grid/30 px-2 sm:px-3 py-1.5 sm:py-2 border-b border-cyber-accent/30">
-                      <span className="text-[10px] sm:text-xs font-medium flex items-center flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 14 : 18} height={isMobile ? 14 : 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-accent mr-1 sm:mr-2">
-                          <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-                          <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-                          <line x1="6" y1="6" x2="6.01" y2="6"></line>
-                          <line x1="6" y1="18" x2="6.01" y2="18"></line>
-                        </svg>
-                        <span className="hidden sm:inline">数据中心选择</span>
-                        <span className="sm:hidden">机房</span>
-                      </span>
-                      <div className="flex gap-1 sm:gap-2 items-center min-w-0 flex-shrink">
-                        <div className="flex gap-1 sm:gap-1.5">
+                  <div className="mt-3 sm:mt-4 rounded-md overflow-hidden border border-cyber-accent/30 w-full">
+                    <div className="bg-cyber-grid/30 px-2 sm:px-3 py-1.5 sm:py-2 border-b border-cyber-accent/30">
+                      <div className="flex items-center justify-between gap-2 w-full">
+                        <span className="text-[10px] sm:text-xs font-medium flex items-center flex-shrink-0">
+                          <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 14 : 18} height={isMobile ? 14 : 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyber-accent mr-1 sm:mr-2 flex-shrink-0">
+                            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                          </svg>
+                          <span className="hidden sm:inline whitespace-nowrap">数据中心选择</span>
+                          <span className="sm:hidden whitespace-nowrap">机房</span>
+                        </span>
+                        <div className="flex gap-1.5 items-center flex-shrink-0">
                           <button
                             onClick={() => checkAvailability(server.planCode)}
                             disabled={isCheckingAvailability || !isAuthenticated}
-                            className="px-1.5 sm:px-2 py-1 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded-md transition-all text-[9px] sm:text-[10px] font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-0.5 sm:gap-1 whitespace-nowrap flex-shrink-0"
+                            className="px-2 py-1 bg-cyber-accent/10 hover:bg-cyber-accent/20 text-cyber-accent border border-cyber-accent/30 hover:border-cyber-accent/50 rounded-md text-[10px] font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 whitespace-nowrap flex-shrink-0"
                           >
                             {isCheckingAvailability && selectedServer === server.planCode ? (
                               <>
-                                <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 9 : 10} height={isMobile ? 9 : 10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-pulse flex-shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-pulse flex-shrink-0">
                                   <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                                 </svg>
                                 查询中
                               </>
                             ) : (
                               <>
-                                <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 9 : 10} height={isMobile ? 9 : 10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                                   <circle cx="12" cy="12" r="10"></circle>
                                   <line x1="12" y1="16" x2="12" y2="12"></line>
                                   <line x1="12" y1="8" x2="12.01" y2="8"></line>
@@ -1837,43 +1839,45 @@ const ServersPage = () => {
                               </>
                             )}
                           </button>
+                          
                           <button
                             onClick={() => {
                               const selectedDcs = getSelectedDatacentersList(server.planCode);
                               addToMonitor(server, selectedDcs);
                             }}
                             disabled={!isAuthenticated}
-                            className="px-1.5 sm:px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/40 hover:border-blue-500/60 rounded-md transition-all text-[9px] sm:text-[10px] font-medium shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-0.5 sm:gap-1 whitespace-nowrap flex-shrink-0"
+                            className="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/40 hover:border-blue-500/60 rounded-md text-[10px] font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 whitespace-nowrap flex-shrink-0"
                             title="添加到服务器监控"
                           >
-                            <Bell size={isMobile ? 9 : 10} className="flex-shrink-0" />
+                            <Bell size={10} className="flex-shrink-0" />
                             监控
                           </button>
+                          
+                          <button
+                            onClick={() => {
+                              const selectedDcs = getSelectedDatacentersList(server.planCode);
+                              if (selectedDcs.length > 0) {
+                                addToQueue(server, selectedDcs);
+                              } else {
+                                toast.error("请至少选择一个数据中心");
+                              }
+                            }}
+                            disabled={!isAuthenticated || getSelectedDatacentersList(server.planCode).length === 0}
+                            className="relative px-3 py-1.5 bg-gradient-to-r from-cyber-primary to-cyber-primary-dark text-white border-2 border-cyber-primary/40 rounded-md text-[10px] font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center gap-1 animate-pulse-slow whitespace-nowrap flex-shrink-0"
+                            style={{ animationDuration: '2s' }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                              <circle cx="9" cy="21" r="1"></circle>
+                              <circle cx="20" cy="21" r="1"></circle>
+                              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                            </svg>
+                            <span className="tracking-wide">抢购</span>
+                            <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 pointer-events-none">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyber-accent opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-3 w-3 bg-cyber-primary"></span>
+                            </span>
+                          </button>
                         </div>
-                        <button
-                          onClick={() => {
-                            const selectedDcs = getSelectedDatacentersList(server.planCode);
-                            if (selectedDcs.length > 0) {
-                              addToQueue(server, selectedDcs);
-                            } else {
-                              toast.error("请至少选择一个数据中心");
-                            }
-                          }}
-                          disabled={!isAuthenticated || getSelectedDatacentersList(server.planCode).length === 0}
-                          className="relative px-3 sm:px-5 py-1.5 sm:py-2 bg-gradient-to-r from-cyber-primary to-cyber-primary-dark hover:from-cyber-primary-dark hover:to-cyber-primary text-white border-2 border-cyber-primary/40 hover:border-cyber-primary rounded-md transition-all text-[10px] sm:text-xs font-bold shadow-lg hover:shadow-xl hover:shadow-cyber-primary/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center gap-1 sm:gap-1.5 animate-pulse-slow whitespace-nowrap flex-shrink-0"
-                          style={{ animationDuration: '2s' }}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 12 : 14} height={isMobile ? 12 : 14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-                            <circle cx="9" cy="21" r="1"></circle>
-                            <circle cx="20" cy="21" r="1"></circle>
-                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                          </svg>
-                          <span className="tracking-wide">抢购</span>
-                          <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyber-accent opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-cyber-primary"></span>
-                          </span>
-                        </button>
                       </div>
                     </div>
                     
