@@ -1620,10 +1620,10 @@ const ServersPage = () => {
           
           <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 flex-wrap">
             <div className="flex items-center flex-shrink-0">
-              <Clock size={isMobile ? 12 : 14} className="text-cyber-muted mr-1 sm:mr-1.5" />
+              <Clock size={isMobile ? 12 : 14} className="text-cyber-muted mr-1 sm:mr-1.5 flex-shrink-0" />
               <span className="text-[10px] sm:text-xs text-cyber-muted whitespace-nowrap">
                 {isMobile 
-                  ? (lastUpdated ? formatDateTime(lastUpdated).split(' ')[1] || formatDateTime(lastUpdated) : '未知')
+                  ? (lastUpdated ? (formatDateTime(lastUpdated).includes('今天') ? formatDateTime(lastUpdated) : formatDateTime(lastUpdated).split(' ').pop() || formatDateTime(lastUpdated)) : '未知')
                   : `更新: ${formatDateTime(lastUpdated)}`}
               </span>
             </div>
