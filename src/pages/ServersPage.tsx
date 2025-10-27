@@ -51,32 +51,49 @@ const globalStyles = `
 .animate-pulse-slow {
   animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
-/* 防止Via浏览器等轻量浏览器中的闪烁 - 增强版 */
+/* 防止Via浏览器等轻量浏览器中的闪烁 - 针对Via内核深度优化 */
 .datacenter-item {
+  /* Via浏览器(Chromium内核)硬件加速优化 */
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
   -webkit-transform: translate3d(0, 0, 0);
   transform: translate3d(0, 0, 0);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* 使用contain来隔离渲染，防止影响其他元素 */
+  
+  /* 强制GPU渲染层 */
+  -webkit-transform-style: preserve-3d;
+  transform-style: preserve-3d;
+  
+  /* 渲染隔离 - 防止重绘扩散 */
   contain: layout style paint;
-  /* 禁用touch-action的默认行为，减少浏览器干预 */
+  isolation: isolate;
+  
+  /* 优化触摸性能 */
   touch-action: manipulation;
-  /* 强制使用硬件加速 */
-  -webkit-perspective: 1000;
-  perspective: 1000;
-  /* 防止文本选择干扰点击 */
   -webkit-user-select: none;
   -moz-user-select: none;
   user-select: none;
-  /* 优化重绘性能 */
-  will-change: auto;
+  
+  /* Via浏览器特殊优化：禁用子像素渲染 */
+  -webkit-transform: translateZ(0) scale(1.0001);
+  transform: translateZ(0) scale(1.0001);
+  
+  /* 强制整像素渲染，避免亚像素抖动 */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  
+  /* 固定will-change，避免动态计算 */
+  will-change: transform;
 }
+
 /* Via浏览器触摸反馈优化 */
 .datacenter-item:active {
   -webkit-tap-highlight-color: transparent;
   tap-highlight-color: transparent;
+  /* 触摸时保持GPU加速 */
+  -webkit-transform: translateZ(0) scale(1);
+  transform: translateZ(0) scale(1);
 }
 `;
 
@@ -1737,7 +1754,7 @@ const ServersPage = () => {
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className={`grid gap-4 sm:gap-6 ${
+            className={`grid gap-4 sm:gap-6 w-full ${
               displayMode === 'compact'
                 ? 'grid-cols-1 lg:grid-cols-3 xl:grid-cols-4'
                 : 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3'
@@ -1748,7 +1765,7 @@ const ServersPage = () => {
               key={server.planCode}
               variants={itemVariants}
             >
-              <Card className="border-cyber-accent/30 overflow-hidden h-full">
+              <Card className="border-cyber-accent/30 overflow-hidden">
                 {/* Header with server code and name */}
                 <CardHeader className="px-2 sm:px-3 py-2 bg-cyber-grid/20 border-b border-cyber-accent/20">
                   <div className="flex justify-between items-center gap-2 min-w-0">
@@ -1837,7 +1854,7 @@ const ServersPage = () => {
                                 <svg xmlns="http://www.w3.org/2000/svg" width={isMobile ? 9 : 10} height={isMobile ? 9 : 10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-pulse flex-shrink-0">
                                   <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                                 </svg>
-                                <span className="hidden sm:inline">查询中</span>
+                                查询中
                               </>
                             ) : (
                               <>
@@ -1846,7 +1863,7 @@ const ServersPage = () => {
                                   <line x1="12" y1="16" x2="12" y2="12"></line>
                                   <line x1="12" y1="8" x2="12.01" y2="8"></line>
                                 </svg>
-                                <span className="hidden sm:inline">检查</span>
+                                检查
                               </>
                             )}
                           </button>
@@ -1860,7 +1877,7 @@ const ServersPage = () => {
                             title="添加到服务器监控"
                           >
                             <Bell size={isMobile ? 9 : 10} className="flex-shrink-0" />
-                            <span className="hidden sm:inline">监控</span>
+                            监控
                           </button>
                         </div>
                         <button
@@ -1881,8 +1898,7 @@ const ServersPage = () => {
                             <circle cx="20" cy="21" r="1"></circle>
                             <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
                           </svg>
-                          <span className="tracking-wide hidden sm:inline">一键抢购</span>
-                          <span className="sm:hidden">抢购</span>
+                          <span className="tracking-wide">抢购</span>
                           <span className="absolute -top-1 -right-1 flex h-3 w-3">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyber-accent opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-3 w-3 bg-cyber-primary"></span>
