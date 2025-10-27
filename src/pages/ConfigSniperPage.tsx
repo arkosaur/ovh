@@ -75,10 +75,11 @@ const ConfigSniperPage: React.FC = () => {
       const response = await apiClient.get(`/config-sniper/options/${planCode.trim()}`);
       
       showToast({ type: 'success', title: '查询成功' });
-      setConfigs(response.data.configs);
+      setConfigs(response.data.configs || []);  // 添加默认值，避免 undefined
       setQueryMode('select');
     } catch (err: any) {
       setError(err.response?.data?.error || '查询失败');
+      setConfigs([]);  // 确保错误时也设置为空数组
     } finally {
       setLoading(false);
     }
@@ -338,12 +339,12 @@ const ConfigSniperPage: React.FC = () => {
               <strong>型号:</strong> {planCode}
               <br className="sm:hidden" />
               <span className="hidden sm:inline"> | </span>
-              <strong className="sm:ml-4">找到 {configs.length} 种配置</strong>
+              <strong className="sm:ml-4">找到 {configs?.length || 0} 种配置</strong>
             </p>
           </div>
 
           <div className="space-y-4">
-            {configs.map((config, index) => (
+            {configs?.map((config, index) => (
               <div
                 key={index}
                 onClick={() => setSelectedConfig(config)}
