@@ -127,6 +127,7 @@ export function formatInterval(seconds: number): string {
       ? `${hours}小时${minutes}分钟` 
       : `${hours}小时`;
   }
+}
 
 /**
  * 格式化重试计数显示
@@ -137,5 +138,4 @@ export function formatRetryCount(count: number, maxRetries: number): string {
   } else {
     return `第 ${count}/${maxRetries} 次尝试`;
   }
-}
 }
