@@ -65,14 +65,14 @@ export const CACHE_KEY = 'ovh-servers-cache';
 /**
  * 后端API地址
  */
-export const API_URL = 'http://localhost:5000/api';
+export const API_URL = '/api';
 
 /**
  * API通信密钥
  * 用于验证前端请求，防止后端被直接调用
  * 生产环境请更换为复杂的随机字符串
  */
-export const API_SECRET_KEY = 'ovh-phantom-sniper-2024-secret-key';
+export const API_SECRET_KEY = import.meta.env.VITE_API_SECRET_KEY || 'ovh-phantom-sniper-2024-secret-key';
 
 /**
  * 前端访问密码
@@ -138,4 +138,5 @@ export function formatRetryCount(count: number, maxRetries: number): string {
   } else {
     return `第 ${count}/${maxRetries} 次尝试`;
   }
+}
 }

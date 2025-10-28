@@ -82,6 +82,7 @@ class Settings(BaseSettings):
     APP_KEY: str = ""
     APP_SECRET: str = ""
     CONSUMER_KEY: str = ""
+    API_SECRET_KEY: str = "ovh-phantom-sniper-2024-secret-key"  # Add this line
     ENDPOINT: str = "ovh-eu"
     TG_TOKEN: str = ""
     TG_CHAT_ID: str = ""
@@ -1583,4 +1584,6 @@ async def create_default_task(data: dict):
 
 # 运行服务器
 if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+:
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
