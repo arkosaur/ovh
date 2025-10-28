@@ -127,7 +127,6 @@ export function formatInterval(seconds: number): string {
       ? `${hours}小时${minutes}分钟` 
       : `${hours}小时`;
   }
-}
 
 /**
  * 格式化重试计数显示
